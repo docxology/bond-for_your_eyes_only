@@ -1,83 +1,37 @@
-# `for_your_eyes_only` - The Repository Exemplar
+# Manuscript (`projects/working/bond/for_your_eyes_only/manuscript/`)
 
-This is the stable code exemplar for the Research Project Template: a tested numerical optimization implementation routed through the shared infrastructure, project test suite, and manuscript renderer.
+This directory holds the ATAC mission manuscript. Numbered prose sections
+(`NN_*.md`) may contain `{{TOKEN}}` placeholders resolved by
+`src/for_your_eyes_only/manuscript_variables.py` at render time.
 
-It demonstrates the complete research pipeline from algorithm implementation through strict validation to multi-format result visualization.
+## Files
 
-## Template Architecture
+| File | Role |
+|---|---|
+| `config.yaml` | Paper metadata + mission parameters (source of variables) |
+| `NN_*.md` | Numbered prose sections (00 abstract … 07 scope, 99 references) |
+| `references.bib` | BibTeX bibliography |
+| `preamble.md` | LaTeX preamble injections |
 
-This project is explicitly designed to showcase the repository's three foundational pillars:
+## Token protocol
 
-1. **`infrastructure/` Layer**: The code delegates tracking, performance benchmarking, stability validation, and PDF rendering to the shared infrastructure packages at the repository root. Current package counts live in [`docs/_generated/COUNTS.md`](../../../../docs/_generated/COUNTS.md).
-2. **`tests/` Integrity**: A zero-mock suite ([`projects/working/bond/for_your_eyes_only/tests/`](../tests/)) with **≥90%** coverage on `projects/working/bond/for_your_eyes_only/src/`. Live test count and measured coverage: [`docs/_generated/COUNTS.md`](../../../../docs/_generated/COUNTS.md).
-3. **`docs/` Orchestration**: Project documentation under `projects/working/bond/for_your_eyes_only/docs/` records the operational patterns and is checked by the repository documentation lint gates.
+* Numeric/result values **must** use `{{TOKEN}}` syntax, never hardcoded prose.
+* The full token set is the return value of `generate_variables()`; the live
+  cross-reference test `tests/test_manuscript_variables.py` fails if a prose
+  token is undefined.
+* Sidecar files that legitimately illustrate `{{TOKEN}}` syntax
+  (this guide, SYNTAX.md, AGENTS.md) are excluded from the strict
+  cross-reference scan.
 
-## Manuscript Structure
+## Figure protocol
 
-The `manuscript/` directory contains the raw markdown files that the renderer (`infrastructure/rendering/pdf_renderer.py`) transforms into the final academic PDF. These files are designed as a meta-narrative to demonstrate exactly how the repository executes:
+Figures are referenced via Pandoc-crossref `[@fig:label]` / `{#fig:label}`
+(see §3). Generators live in `src/for_your_eyes_only/figures.py` and render
+deterministically to `output/figures/`.
 
-- `00_abstract.md`: Abstract; build variables and CSV-backed prose via `scripts/z_generate_manuscript_variables.py`.
-- `01_introduction.md`: Introduction of the infrastructure pillars bridging to CI/CD files.
-- `02_methodology.md`: Mathematical methods mapping to specific python script execution lines.
-- `03_results.md`: Convergence analysis built via `infrastructure.reporting`, pointing back at itself.
-- `04_conclusion.md`: Summary of the template automation and publication outputs.
-
-## Architecture
-
-The project acts as a bridge between custom mathematical logic and the repository's core:
-
-```mermaid
-graph TD
-    classDef infra fill:#f5f5f5,stroke:#333,stroke-width:2px;
-    classDef project fill:#e1f5fe,stroke:#0277bd,stroke-width:2px;
-    classDef docs fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
-
-    subgraph "Project Space (`projects/working/bond/for_your_eyes_only/`)"
-        Script["scripts/optimization_analysis.py"]:::project
-        Manuscript["manuscript/*.md"]:::project
-    end
-
-    subgraph "Template Ecosystem"
-        Tests["tests/ (see canonical facts)"]:::docs
-        Config["config.yaml & preamble.md"]:::docs
-
-        subgraph "`infrastructure/`"
-            Validation["infrastructure.validation"]:::infra
-            Scientific["infrastructure.scientific"]:::infra
-            Reporting["infrastructure.reporting"]:::infra
-            Rendering["infrastructure.rendering"]:::infra
-        end
-    end
-
-    Script -->|Delegates precision checks| Scientific
-    Script -->|Tested strictly by| Tests
-    Tests -->|Protected by| Validation
-    Script -->|Generates data for| Reporting
-    Reporting -->|Formats| Manuscript
-    Manuscript -->|Compiled with| Config
-    Config -->|Sent to| Rendering
-    Rendering -->|Produces| PDF["output/templates/for_your_eyes_only/pdf/template_code_project_combined.pdf"]:::project
-```
-
-## Quick Start
-
-Experience the automated pipeline directly:
+## Reproduction
 
 ```bash
-# From repository root
-uv run python projects/working/bond/for_your_eyes_only/scripts/optimization_analysis.py
-
-uv run python scripts/pipeline/stage_03_render.py --project templates/for_your_eyes_only
-
-open output/templates/for_your_eyes_only/pdf/template_code_project_combined.pdf
+uv run python scripts/z_generate_manuscript_variables.py
+# writes output/data/manuscript_variables.json, output/manuscript/, output/figures/
 ```
-
-## AI Agent Directives
-
-If you are an AI agent operating in this repository, you **MUST** read [`AGENTS.md`](AGENTS.md) before executing any code modifications. It defines the zero-mock testing constraints and infrastructure coupling rules.
-
-## See also
-
-- [`SYNTAX.md`](SYNTAX.md) — Pandoc citation / cross-reference conventions for this manuscript.
-- [`../../../docs/guides/manuscript-semantics.md`](../../../../docs/guides/manuscript-semantics.md) — Repository-wide manuscript semantics.
-- [`../../../AGENTS.md`](../../../AGENTS.md#permanent-canonical-exemplars) — public exemplar roster.

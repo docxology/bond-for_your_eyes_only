@@ -6,25 +6,18 @@
       "orcid": "0000-0001-6232-9096"
     }
   ],
-  "description": "Source code for Convergence Analysis of Gradient Descent Optimization (2026).",
+  "description": "ATAC special-agent mission software for the For Your Eyes Only (1981) BOND film package: targeting-communicator key escrow/recovery, underwater retrieval planning, and Greek-island insertion routing.",
   "keywords": [
-    "optimization algorithms",
-    "gradient descent",
-    "convergence analysis",
-    "numerical methods",
-    "mathematical programming",
-    "reproducible research",
-    "infrastructure automation"
+    "key escrow and recovery",
+    "Shamir secret sharing",
+    "underwater retrieval planning",
+    "decompression modelling",
+    "island routing",
+    "Dijkstra shortest path",
+    "deterministic mission software"
   ],
   "license": "MIT",
-  "related_identifiers": [
-    {
-      "identifier": "10.5281/zenodo.20417136",
-      "relation": "isVersionOf",
-      "scheme": "doi"
-    }
-  ],
-  "title": "Convergence Analysis of Gradient Descent Optimization",
+  "title": "For Your Eyes Only: ATAC — Special-Agent Mission Software",
   "upload_type": "software",
-  "version": "2.5.2"
+  "version": "0.1.0"
 }

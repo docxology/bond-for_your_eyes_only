@@ -1,5 +1,5 @@
-# Code Project Configuration
-# Inherits workspace settings from root pyproject.toml
+# PROJECT BOND — for_your_eyes_only (For Your Eyes Only, 1981) · mission codename ATAC
+# Local-only BOND suite package. Depends on the frozen bond_api protocol.
 
 [build-system]
 requires = ["setuptools>=61.0"]
@@ -7,9 +7,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "for_your_eyes_only"
-version = "2.5.2"
+version = "0.1.0"
 license = {text = "MIT"}
-description = "Fully-tested codebase with numerical optimization and analysis"
+description = "ATAC: targeting-communicator escrow/recovery, underwater retrieval, Greek-island insertion routing"
 authors = [
     {name = "Daniel Ari Friedman", email = "daniel@activeinference.institute"}
 ]
@@ -18,27 +18,31 @@ dependencies = [
     "numpy>=1.24.0",
     "matplotlib>=3.7.0",
     "pyyaml>=6.0",
-    "defusedxml>=0.7.1",
+    "bond-api",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
+    "ruff>=0.6.0",
+    "mypy>=1.10.0",
+    "types-PyYAML>=6.0",
 ]
 
+# Local path dependency so the frozen bond-api protocol is importable
+# (the orchestrator discovers us via bond_api; do not invent protocol types).
+[tool.uv.sources]
+bond-api = { path = "/Users/4d/Documents/GitHub/template/projects/working/bond/bond-api" }
+
 [tool.pytest.ini_options]
-# RASP Strict Assertion: Tests must be clearly separated and structurally identifiable
 pythonpath = [".", "src"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-# `--strict-markers` prevents typos in marker definitions
 addopts = "-v --tb=short --strict-markers"
 
 [tool.coverage.run]
-# Core Template Rule: We only calculate coverage for primary source code (`src/`),
-# ensuring test code itself does not artificially inflate metric scores.
 source = ["src"]
 branch = true
 omit = [
@@ -48,8 +52,6 @@ omit = [
 ]
 
 [tool.coverage.report]
-# ≥90% on src/ is the enforced gate; live coverage % is tracked in
-# docs/_generated/COUNTS.md (do not hardcode it here — it drifts).
 fail_under = 90
 show_missing = true
 precision = 2
@@ -59,5 +61,15 @@ exclude_lines = [
     "raise NotImplementedError",
 ]
 
-[tool.uv]
-# Inherits workspace settings from root pyproject.toml
+[tool.mypy]
+python_version = "3.12"
+mypy_path = ["src"]
+explicit_package_bases = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+ignore_missing_imports = true

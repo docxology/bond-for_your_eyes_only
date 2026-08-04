@@ -5,8 +5,11 @@ __pycache__/
 *.pyc
 .benchmarks/
 
-# Egg-info from local installs (any location — guards against renamed-fork drift).
-**/*.egg-info/
+# Regenerable artifacts (script/generation output) — keep the tree clean.
+output/
 
-# Project-local virtualenvs (root .venv is shared)
+# Project-local virtualenvs
 .venv/
+
+# Egg-info from local installs
+**/*.egg-info/

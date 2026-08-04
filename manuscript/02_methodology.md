@@ -1,83 +1,65 @@
-# Methodology {#sec:methodology}
+# Methodology
 
-This section describes the implementation methodology, explicitly detailing how the optimization algorithms are constructed, validated, and analyzed using the Generalized Research Template's `infrastructure` and `tests` ecosystems.
+This section details the deterministic mathematics behind each of the three
+mission modules.
 
-## Algorithm Implementation
+## Key escrow and recovery
 
-### Gradient Descent Algorithm
+The ATAC key is escrowed using **Shamir's secret-sharing scheme** over the
+finite field $\mathrm{GF}(p)$ with $p = 2^{61} - 1$. A random polynomial
 
-The core algorithm implements the iterative procedure for unconstrained optimization. The [`optimizer` module](https://github.com/docxology/template/blob/main/projects/working/bond/for_your_eyes_only/src/optimizer.py) uses the standard-library `logging` logger for optional verbose diagnostics; the [analysis orchestrator](https://github.com/docxology/template/blob/main/projects/working/bond/for_your_eyes_only/scripts/optimization_analysis.py) uses `infrastructure.core.logging.utils.get_logger`. Tests run under the hermetic boundaries defined in the [test configuration](https://github.com/docxology/template/blob/main/projects/working/bond/for_your_eyes_only/tests/conftest.py).
+$$f(x) = a_0 + a_1 x + \cdots + a_{k-1} x^{k-1} \pmod{p}$$
 
-**Algorithm — Gradient Descent (implemented in the [optimizer module](https://github.com/docxology/template/blob/main/projects/working/bond/for_your_eyes_only/src/optimizer.py#L87-L173))**
+is sampled with constant term $a_0$ equal to the key; each of $n$ custodians
+receives a distinct point $(x_i, f(x_i))$. Any $k$ points reconstruct the
+polynomial — and hence the key — by Lagrange interpolation:
 
-> **Input:** Initial point $x_0$, step size $\alpha$, tolerance $\epsilon$, max iterations $N_{\max}$
->
-> 1. Initialize $k \leftarrow 0$
-> 2. **While** $k < N_{\max}$ **do:**
->    - Compute gradient $g_k = \nabla f(x_k)$
->    - **If** $\|g_k\|_2 < \epsilon$ **then return** $x_k$ *(converged)*
->    - Update: $x_{k+1} \leftarrow x_k - \alpha \cdot g_k$
->    - $k \leftarrow k + 1$
-> 3. **Return** $x_k$ *(max iterations reached)*
+$$f(x) = \sum_{i=1}^{k} f(x_i) \prod_{j \neq i} \frac{x - x_j}{x_i - x_j} \pmod{p},$$
 
-## Infrastructure Integration
+while fewer than $k$ shares reveal nothing about the key. The mission uses
+$n = ${{RESULT_ESCROW_SHARES}} shares and a quorum $k = ${{RESULT_ESCROW_THRESHOLD}}.
 
-The methodology explicitly bridges theoretical mathematics with production-grade validation through the `infrastructure.scientific` module.
+**Verification.** Each share $(x_i, y_i)$ is committed as $g^{y_i} \bmod p$
+for a primitive root $g$; any party holding a claimed share can verify it
+against the commitment, so a share tampered with during custody is rejected
+before release.
 
-### Numerical Stability Analysis
+**Custody.** Handoffs are recorded in a SHA-256 hash-chained ledger, binding
+the whole custody history append-only.
 
-Rather than writing ad-hoc validation code, the project imports `infrastructure.scientific.stability.check_numerical_stability`. This utility subjects the objective function to a barrage of extreme inputs (NaN, Inf, $\pm 10^{10}$) to calculate a formalized stability score. If this score degrades, the [analysis orchestrator](https://github.com/docxology/template/blob/main/scripts/pipeline/stage_02_analysis.py) execution deliberately aborts, ensuring the methodology cannot enter unrecoverable states.
+**Release.** Release reconstructs the key from a verified quorum and confirms
+it reproduces the escrow's key fingerprint. With the canonical key the
+recovered value is {{RESULT_ESCROW_KEY}} (matches fingerprint:
+{{RESULT_RECOVERED_MATCH}}).
 
-### Performance Benchmarking
+## Underwater retrieval planning
 
-The analysis exercises [`infrastructure.scientific.benchmarking.benchmark_function`](https://github.com/docxology/template/blob/main/infrastructure/scientific/benchmarking.py) as a runtime diagnostic. Host-dependent timing and memory observations are logged but excluded from tracked evidence. The canonical report records fixed inputs and exact objective values, while the dimensional figure reports deterministic convergence iterations and the proxy $d \times \text{iterations}$; neither surface claims that one host run proves an asymptotic bound.
+The device rests on the seabed at depth $d$ under a horizontal current
+$(u, v)$. A **Haldane-style tissue model** — a set of compartments each with
+half-time $t_{1/2}$ — drives the decompression schedule. Compartment pressure
+relaxes exponentially toward the ambient pressure with time constant
+$\tau = t_{1/2}/\ln 2$.
 
-## Convergence Analysis
+**Current-drift compensation.** Over a total dive time $T$, a stationary
+descent bell drifts by $-T(u, v)$ relative to the seabed target. The bell
+therefore starts at offset $(T u, T v)$ upstream. The planned wreck depth is
+{{RESULT_WRECK_DEPTH}} m; total dive time {{RESULT_DIVE_TOTAL_S}} s yields a
+surface offset of ({{RESULT_SURFACE_OFFSET_E}}, {{RESULT_SURFACE_OFFSET_N}}) m
+(within tolerance: {{RESULT_TARGET_REACHABLE}}).
 
-For quadratic functions $f(x) = \frac{1}{2}x^T A x - b^T x$ where $A$ is positive definite, the convergence factor becomes [@bertsekas1999nonlinear]:
+**Decompression ceiling.** Each compartment has an M-value ceiling; the
+no-decompression bottom time is the exposure at which the limiting compartment
+first saturates to its ceiling. The ascent is staged in fixed-depth steps so
+no compartment violates its ceiling.
 
-\begin{equation}
-\label{eq:convergence_factor}
-\rho = \frac{|\lambda_{\max} - \alpha\lambda_{\min}|}{|\lambda_{\min} + \alpha\lambda_{\max}|}
-\end{equation}
+## Greek-island insertion routing
 
-Optimal convergence occurs when $\alpha = \frac{2}{\lambda_{\min} + \lambda_{\max}}$, yielding $\rho = \frac{\kappa - 1}{\kappa + 1}$.
+The Ionian islands are modelled as a **weighted undirected graph** with fixed
+node positions; each edge carries a distance (nm) and a risk weight. Routing
+finds the minimum-*cost* path, where edge cost blends distance and risk:
+$c = d + \lambda r$ with a configurable risk penalty $\lambda$. The planner
+uses **Dijkstra's algorithm** (or A* with a straight-line admissible
+heuristic), returning the same optimum deterministically.
 
-## Experimental Setup
-
-### Step Size Analysis
-
-Step sizes are not chosen ad hoc in the manuscript: they are read from `experiment.step_sizes` in `manuscript/config.yaml` and passed through `run_convergence_experiment()` in `src/analysis/` (entry: `scripts/optimization_analysis.py`). The active grid for this build is:
-
-{{CONFIG_STEP_SIZES_BULLETS}}
-
-Labels follow the same agency taxonomy used for plot colours (`_agency_category` in the analysis script): **conservative** (small $\alpha$, slow but stable on $H=I$), **near-optimal** (including $\alpha=1$ where the method reaches $x^\ast$ in one step for this quadratic), **aggressive** ($1 < \alpha < 2$, still linearly contracting in $|x-x^\ast|$ but oscillatory in sign), and **divergent** ($|1-\alpha| \geq 1$).
-
-### Zero-Mock Testing Methodology
-
-The most critical aspect of the project's methodology is its validation framework. The project is governed by a strict Zero-Mock testing policy, evaluated actively by executing `uv run pytest projects/working/bond/for_your_eyes_only/tests/` during the infrastructure build phase.
-
-1. **Project tests**: [`projects/working/bond/for_your_eyes_only/tests/test_optimizer.py`](../tests/test_optimizer.py) exercises `src/optimizer.py` (typical, edge, boundary, and pathological inputs including NaN/Inf and zero gradients) and, when infrastructure imports succeed, call into `optimization_analysis.py` helpers—without mocks. Suite size: [`docs/_generated/COUNTS.md`](../../../../docs/_generated/COUNTS.md).
-2. **Infrastructure validation**: The repository-level `tests/infra_tests/` suite validates shared template modules (e.g. pipeline and discovery helpers) independently of this project’s manuscript.
-3. **Coverage Gates**: The [GitHub Actions CI workflow](https://github.com/docxology/template/blob/main/.github/workflows/ci.yml) enforces a mandatory ≥90% statement coverage gate on `projects/working/bond/for_your_eyes_only/src/` prior to treating the project as build-green.
-
-### Stopping rule and reporting
-
-`gradient_descent()` terminates when $\|\nabla f(x_k)\|$ falls below `experiment.tolerance`, when $k$ reaches `experiment.max_iterations`, or when an objective, gradient, or update becomes non-finite. The boolean `converged` plus `termination_reason` in exported CSV rows distinguish these outcomes. A non-finite candidate is rejected before it enters `objective_history`, preserving the last finite state for reproducible reporting. Downstream, `scripts/z_generate_manuscript_variables.py` aggregates the CSV into `RESULT_*` placeholders so tables and prose cannot drift from the last analysis run.
-
-### Figure generation contract
-
-Each figure in `03_results.md` maps to a generator in `src/figures/` (`generate_convergence_plot`, `generate_step_size_sensitivity_plot`, `generate_convergence_rate_plot`, `generate_complexity_visualization`, `generate_stability_visualization`, `generate_benchmark_visualization`), orchestrated by `src/analysis/` / `scripts/optimization_analysis.py`. Captions in the markdown intentionally name the function and the key parameters (tolerance lines, grids, dimensions) so reviewers can navigate from PDF to code without inferring hidden defaults.
-
-The same generator writes explicit `metadata.alt_text` for every registered
-figure. The alt text states what the visual encodes and preserves the boundary
-between deterministic observations and host-dependent diagnostics. Run the
-opt-in publication migration gate with
-`--require-figure-accessibility` to verify that every referenced figure has
-this metadata before promotion.
-
-## Analysis Pipeline & LaTeX Integration
-
-The automated analysis script leverages [`infrastructure.core.progress`](https://github.com/docxology/template/blob/main/infrastructure/core/progress.py) (`ProgressBar`, `SubStageProgress`) to orchestrate experiments, collect convergence trajectories, and generate publication-quality visualizations seamlessly.
-
-The research template supports advanced LaTeX customization through the `preamble.md` configuration. This is ingested directly by `infrastructure.rendering.latex_utils.py` and `pdf_renderer.py`, automatically linking compiled PGF plots and BibTeX citations. This automated approach ensures an unbreakable chain of custody from raw algorithmic execution to the final rendered manuscript.
+The canonical insertion route is {{RESULT_ROUTE}} — {{RESULT_ROUTE_HOPS}} hops,
+{{RESULT_ROUTE_DISTANCE}} nm, total cost {{RESULT_ROUTE_COST}}.

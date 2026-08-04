@@ -13,19 +13,17 @@
       "givenName": "Daniel Ari"
     }
   ],
-  "codeRepository": "https://github.com/docxology/for_your_eyes_only",
-  "dateModified": "2026-07-10",
-  "identifier": "10.5281/zenodo.20417136",
+  "dateModified": "2026-08-04",
   "keywords": [
-    "optimization algorithms",
-    "gradient descent",
-    "convergence analysis",
-    "numerical methods",
-    "mathematical programming",
-    "reproducible research",
-    "infrastructure automation"
+    "key escrow and recovery",
+    "Shamir secret sharing",
+    "underwater retrieval planning",
+    "decompression modelling",
+    "island routing",
+    "Dijkstra shortest path",
+    "deterministic mission software"
   ],
   "license": "https://spdx.org/licenses/MIT",
-  "name": "Convergence Analysis of Gradient Descent Optimization",
-  "version": "2.5.2"
+  "name": "For Your Eyes Only: ATAC — Special-Agent Mission Software",
+  "version": "0.1.0"
 }

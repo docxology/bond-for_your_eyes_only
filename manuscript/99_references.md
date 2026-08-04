@@ -1,10 +1,12 @@
-# References {#sec:references}
+# References
 
-Bibliography lives in [`manuscript/references.bib`](references.bib) and is read by Pandoc during PDF render. The build pipeline invokes Pandoc with `--natbib`, so every `[@key]` citation in the manuscript is rewritten to the appropriate `\cite{}`/`\citep{}`/`\citet{}` LaTeX command and resolved against the bib file.
-
-To validate that `references.bib` is syntactically clean and contains the required fields per entry type:
-
-```bash
-uv run python -m infrastructure.reference.citation.cli validate \
-    projects/working/bond/for_your_eyes_only/manuscript/references.bib --strict
-```
+- Shamir, A. (1979). *How to share a secret.* Communications of the ACM,
+  22(11), 612–613. (Threshold secret sharing via polynomial interpolation.)
+- Haldane, J. S. (1908). The relation of the action of carbonic oxide to
+  oxygen tension. *Journal of Physiology*, 37, 355. (Compartmental tissue
+  saturation model, the basis of staged decompression.)
+- Dijkstra, E. W. (1959). A note on two problems in connexion with graphs.
+  *Numerische Mathematik*, 1, 269–271. (Shortest-path algorithm.)
+- Hart, P. E., Nilsson, N. J., & Raphael, B. (1968). A formal basis for the
+  heuristic determination of minimum cost paths. *IEEE Trans. SSC*, 4(2),
+  100–107. (A* search.)
