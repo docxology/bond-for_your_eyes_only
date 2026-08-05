@@ -79,6 +79,37 @@ def render_island_graph(
     return dest
 
 
+def dive_profile_series(
+    profile: underwater_retrieval.DiveProfile,
+) -> tuple[list[float], list[float]]:
+    """Return ``(elapsed_times_s, depths_m)`` tracing a dive profile for plotting.
+
+    Each ascent stage records the depth at its *start*, so the depth reached at
+    the end of stage ``i`` is the start depth of stage ``i+1`` (0 m for the last
+    stage). Deriving it that way keeps the plotted curve equal to the staged
+    climb :func:`underwater_retrieval.plan_descent` actually computed. Reading
+    a stage's own depth as a *decrement* instead collapses the whole ascent
+    into a single jump to the surface, which is why this is a named, tested
+    function rather than inline plotting arithmetic.
+    """
+    times: list[float] = [0.0]
+    depths: list[float] = [0.0]
+    t = 0.0
+    for stage in profile.descent_stages:
+        t += stage.duration_s
+        times.append(t)
+        depths.append(stage.depth)
+    t += profile.bottom_time_s
+    times.append(t)
+    depths.append(profile.max_depth())
+    ascent = profile.ascent_stages
+    for index, stage in enumerate(ascent):
+        t += stage.duration_s
+        times.append(t)
+        depths.append(ascent[index + 1].depth if index + 1 < len(ascent) else 0.0)
+    return times, depths
+
+
 def render_dive_profile(
     *,
     output_path: str | Path | None = None,
@@ -91,22 +122,7 @@ def render_dive_profile(
     planner = underwater_retrieval.RetrievalPlanner(wreck_depth=wreck_depth)
     plan = planner.plan()
     profile = plan.profile
-
-    # Rebuild the schedule as (time_start, depth).
-    times: list[float] = [0.0]
-    depths: list[float] = [0.0]
-    t = 0.0
-    for stage in profile.descent_stages:
-        t += stage.duration_s
-        times.append(t)
-        depths.append(stage.depth)
-    t += profile.bottom_time_s
-    times.append(t)
-    depths.append(profile.max_depth())
-    for stage in sorted(profile.ascent_stages, key=lambda s: -s.duration_s):
-        t += stage.duration_s
-        times.append(t)
-        depths.append(max(0.0, depths[-1] - stage.depth))
+    times, depths = dive_profile_series(profile)
 
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(times, [-d for d in depths], color="#2980b9", lw=2)

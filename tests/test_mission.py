@@ -109,9 +109,16 @@ def test_releasing_gadget_escrow_recovers():
     from typing import cast
 
     from for_your_eyes_only.key_escrow import EscrowState, release_key
-    from for_your_eyes_only.mission import GADGETS
+    from for_your_eyes_only.mission import GADGETS, key_fingerprint
 
     escrow = cast(EscrowState, GADGETS["escrow"])
     key = release_key(escrow, tuple(range(escrow.threshold)))
-    assert key == key  # deterministic self-consistency
     assert isinstance(key, int)
+    # Bind the released key to something outside itself. `assert key == key`
+    # (the earlier assertion here) is a value compared to itself and cannot
+    # fail; these can. The key must re-derive the escrow's stored fingerprint,
+    # a *different* quorum must return the same key, and it must land in the
+    # field the escrow was built over.
+    assert key_fingerprint(key) == escrow.key_fingerprint
+    assert release_key(escrow, (escrow.num_shares - 1, escrow.num_shares - 2)) == key
+    assert 0 < key < escrow.prime

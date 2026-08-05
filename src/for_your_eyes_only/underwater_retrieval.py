@@ -17,10 +17,21 @@ Real models behind the code:
   tissue compartments, each with a half-time :math:`t_{1/2}`. Tissue pressure
   follows :math:`dP/dt = (P_{ambient} - P)/\\tau`, giving exponential ascent
   toward the ambient partial pressure. A decompression ceiling is computed per
-  compartment (M-value), and the ascent is staged so no tissue violates its
-  ceiling — producing deterministic decompression stops.
+  compartment (M-value) by :meth:`HaldaneModel.ceiling_m`, and the exposure at
+  which the limiting compartment reaches it by
+  :func:`no_decompression_limit`.
 * **Ascent scheduling**: the profile is a sequence of (depth, duration) stages
   traversed bottom-up; stops are snapped to a fixed interval (e.g. 3 m).
+
+.. warning::
+
+    The tissue model and the ascent schedule are **not yet coupled**.
+    :func:`plan_descent` stages the climb geometrically — fixed
+    ``STOP_INTERVAL`` steps at fixed ``ASCENT_RATE`` — without consulting any
+    compartment ceiling, so a stage boundary in a profile is not a
+    decompression obligation and the profile is not a physiologically
+    validated schedule. Wiring the ceiling into the staging is tracked as open
+    work in ``TODO.md``.
 
 All parameters are fixed and the computation is purely arithmetic, so dive
 plans are byte-reproducible.
