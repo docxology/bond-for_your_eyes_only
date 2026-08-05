@@ -13,9 +13,10 @@ requirement while staying infrastructure-free.
 
 from __future__ import annotations
 
+import os
 import platform
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -25,10 +26,15 @@ from for_your_eyes_only.mission import ATAC_MISSION, MISSION_SEED, SLUG, canonic
 
 __all__ = [
     "METRIC_TOKENS",
+    "SOURCE_DATE_EPOCH",
     "generate_variables",
     "load_manuscript_config",
     "resolve_manuscript_tree",
+    "source_date",
 ]
+
+#: Reproducible-builds environment variable honoured for the generation stamp.
+SOURCE_DATE_EPOCH = "SOURCE_DATE_EPOCH"
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = PACKAGE_ROOT / "manuscript" / "config.yaml"
@@ -110,11 +116,44 @@ def load_manuscript_config(config_path: str | Path | None = None) -> dict[str, A
     return data
 
 
+def source_date(config: dict[str, Any]) -> datetime:
+    """Return the deterministic build stamp written into persisted artifacts.
+
+    Wall-clock time is deliberately *not* used. ``datetime.now()`` here made the
+    package's determinism claim false: two runs seconds apart wrote different
+    bytes into ``output/data/manuscript_variables.json`` and
+    ``output/manuscript/05_experimental_setup.md``, so "regenerating reproduces
+    the tree byte-for-byte" could not hold no matter what else was fixed.
+
+    The stamp is resolved from two tracked sources, in order:
+
+    1. ``SOURCE_DATE_EPOCH`` (the reproducible-builds convention), when set;
+    2. otherwise the manuscript's declared ``paper.date``, at midnight UTC.
+
+    Both are inputs under version control, so the same checkout always renders
+    the same bytes.
+    """
+    raw = os.environ.get(SOURCE_DATE_EPOCH)
+    if raw:
+        try:
+            epoch = int(raw)
+        except ValueError as exc:
+            raise ValueError(f"{SOURCE_DATE_EPOCH} must be an integer POSIX timestamp, got {raw!r}") from exc
+        return datetime.fromtimestamp(epoch, tz=timezone.utc)
+
+    paper = config.get("paper", {})
+    declared = paper.get("date") if isinstance(paper, dict) else None
+    if declared is None:
+        raise ValueError("manuscript config must declare paper.date (the deterministic build stamp)")
+    day = declared if isinstance(declared, date) else date.fromisoformat(str(declared))
+    return datetime.combine(day, time(0, 0), tzinfo=timezone.utc)
+
+
 def generate_variables(
     *,
     config_path: str | Path | None = None,
     require_outputs: bool = True,
-    now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+    now: Callable[[], datetime] | None = None,
     metrics_provider: Callable[[], dict[str, str]] = _compute_mission_metrics,
 ) -> dict[str, str]:
     """Compute the ``{{TOKEN}}`` → value mapping for the manuscript.
@@ -123,7 +162,8 @@ def generate_variables(
         config_path: Override for ``manuscript/config.yaml``.
         require_outputs: When True (default), fail if the domain modules cannot
             produce live results (metrics fall back to "N/A" only in draft).
-        now: A thunk returning the current UTC time (override for tests).
+        now: Override for the build stamp. ``None`` (default) resolves it
+            deterministically via :func:`source_date`; no wall clock is read.
         metrics_provider: The callable that computes the live result metrics.
             A real seam, not a stand-in: tests pass an ordinary function that
             raises so the strict-vs-draft branch is exercised by real control
@@ -156,7 +196,7 @@ def generate_variables(
         "CONFIG_KEYWORDS": ", ".join(config_keywords),
         "CONFIG_NUM_KEYWORDS": str(len(config_keywords)),
         "PYTHON_VERSION": platform.python_version(),
-        "GENERATION_TIMESTAMP": now().isoformat(timespec="seconds"),
+        "SOURCE_DATE": (now() if now is not None else source_date(config)).isoformat(timespec="seconds"),
     }
     return variables
 

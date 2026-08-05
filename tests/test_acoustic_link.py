@@ -27,10 +27,38 @@ def test_transmission_loss_grows_with_range():
 
 
 def test_transmission_loss_spreading_cylindrical_less_than_spherical():
-    """Cylindrical spreading (spreading=1) gives less loss than spherical (2)."""
-    cyl = ac.transmission_loss(1000.0, 15.0, spreading=1.0)
-    sph = ac.transmission_loss(1000.0, 15.0, spreading=2.0)
+    """Cylindrical spreading (exponent 1) gives less loss than spherical (2)."""
+    cyl = ac.transmission_loss(1000.0, 15.0, spreading=ac.CYLINDRICAL_SPREADING)
+    sph = ac.transmission_loss(1000.0, 15.0, spreading=ac.SPHERICAL_SPREADING)
     assert cyl < sph
+
+
+def test_geometric_spreading_exponent_is_what_the_label_says():
+    """Pin the exponent itself: a decade of range costs 10*n dB of spreading.
+
+    The ordering test above passes for *any* increasing function of the
+    spreading parameter — it held while the code computed 20*n*log10(r), which
+    made `spreading=2.0` (labelled spherical) 40*log10(r) and `spreading=1.0`
+    (labelled cylindrical) actually spherical. Subtracting the absorption term
+    isolates the geometry and binds each named constant to its textbook law.
+    """
+
+    def geometric(range_m: float, spreading: float) -> float:
+        absorption = ac.thorp_absorption(15.0) * range_m / 1000.0
+        return ac.transmission_loss(range_m, 15.0, spreading=spreading) - absorption
+
+    # Spherical: 20 dB per decade, and exactly 20*log10(r).
+    assert geometric(10_000.0, ac.SPHERICAL_SPREADING) - geometric(1_000.0, ac.SPHERICAL_SPREADING) == pytest.approx(
+        20.0
+    )
+    assert geometric(1_000.0, ac.SPHERICAL_SPREADING) == pytest.approx(60.0)
+    # Cylindrical: 10 dB per decade, and exactly 10*log10(r).
+    assert geometric(10_000.0, ac.CYLINDRICAL_SPREADING) - geometric(
+        1_000.0, ac.CYLINDRICAL_SPREADING
+    ) == pytest.approx(10.0)
+    assert geometric(1_000.0, ac.CYLINDRICAL_SPREADING) == pytest.approx(30.0)
+    # The module default is the spherical exponent.
+    assert ac.SPREADING == ac.SPHERICAL_SPREADING
 
 
 def test_transmission_loss_validation():
@@ -44,6 +72,22 @@ def test_noise_level_grows_with_sea_state():
     calm = ac.noise_level(0.0)
     rough = ac.noise_level(5.0)
     assert rough > calm
+    with pytest.raises(ValueError):
+        ac.noise_level(-1.0)
+
+
+def test_mission_link_noise_is_computed_from_the_declared_sea_state():
+    """`noise_level` is consumed, not decorative.
+
+    It was previously exported and tested while nothing called it: the mission
+    link carried a hand-typed 55.0 dB literal unrelated to the model. This
+    binds the two, so changing the sea state moves the link budget.
+    """
+    from for_your_eyes_only.mission import ATAC_LINK, ATAC_SEA_STATE
+
+    assert ATAC_LINK.noise_level_db == pytest.approx(ac.noise_level(ATAC_SEA_STATE))
+    # And the binding is load-bearing: a different sea state is a different NL.
+    assert ac.noise_level(ATAC_SEA_STATE + 1.0) != pytest.approx(ATAC_LINK.noise_level_db)
 
 
 def test_received_snr_decreases_with_range():

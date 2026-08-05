@@ -17,7 +17,7 @@ technical problems remains, which is what this package implements:
 | A device too dangerous for any one person to control | Threshold key escrow: no single custodian can release the key |
 | A key that must survive being lost at sea | Erasure coding: any `k` of `n` stored fragments reconstruct it |
 | The wreck lies at depth under current | Dive planning with decompression scheduling and drift compensation |
-| Reaching the site across the Ionian islands | Least-cost route planning that trades distance against risk |
+| Reaching the site across the Ionian islands | Least-cost route planning over a distance-plus-risk cost |
 | The device directs a weapon onto a moving contact | Constant-bearing fire-control intercept solution |
 | It must report the solution from underwater | Underwater acoustic link budget and coverage radius |
 
@@ -31,7 +31,7 @@ support.
 | `src/for_your_eyes_only/key_escrow.py` | ATAC key escrow: custody, verification, quorum release | Shamir secret sharing over GF(2⁶¹−1), `g^y` share commitments, SHA-256 custody chain |
 | `src/for_your_eyes_only/key_recovery.py` | Erasure-coded key survival; any `k` of `n` fragments reconstruct | Systematic Reed–Solomon-style code over GF(p), Vandermonde solve, integrity checksum |
 | `src/for_your_eyes_only/underwater_retrieval.py` | Dive profile, decompression limits, current-drift offset | Haldane multi-compartment tissue model, staged ascent, ballistic drift |
-| `src/for_your_eyes_only/island_routing.py` | Least-cost Ionian insertion route | Weighted graph, Dijkstra and A\* with a straight-line admissible heuristic |
+| `src/for_your_eyes_only/island_routing.py` | Least-cost Ionian insertion route (risk changes cost, not choice — see [`docs/architecture.md`](docs/architecture.md)) | Weighted graph, Dijkstra and A\* with a straight-line admissible heuristic |
 | `src/for_your_eyes_only/targeting.py` | Fire-control firing solution against a moving contact | Constant-bearing intercept quadratic, lead angle, closest-approach fallback |
 | `src/for_your_eyes_only/acoustic_link.py` | Uplink budget and coverage radius | Thorp absorption, spreading loss, `SNR = SL − TL − NL + DI`, bounded bisection |
 | `src/for_your_eyes_only/mission.py` | The frozen-protocol adapter and canonical scenario | Implements `bond_api.MissionProvider`; owns `GADGETS` and `canonical_mission()` |
@@ -153,8 +153,11 @@ The orchestrator's `load_provider("for_your_eyes_only")` discovers
 ## Provenance
 
 Deterministic throughout: one fixed seed, no untracked randomness, no
-wall-clock value in any persisted artifact. Regenerating `output/` reproduces
-it byte-for-byte.
+wall-clock value in any persisted artifact — the one date in the tree is a
+build stamp taken from `SOURCE_DATE_EPOCH` or the declared `paper.date`.
+Regenerating `output/` reproduces it byte-for-byte, checked by
+`tests/test_scripts_smoke.py::test_regenerating_the_artifact_tree_is_byte_identical`,
+which runs the generator twice into two roots and diffs every file.
 
 This is a **local-only** tree with no remote — never push.
 

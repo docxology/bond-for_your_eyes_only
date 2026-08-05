@@ -22,7 +22,7 @@ Token names are `[A-Z0-9_]+` between double braces. There are three families:
 |---|---|---|
 | `RESULT_*` | computed live from `mission.canonical_mission()` | `RESULT_ROUTE`, `RESULT_FIRE_LEAD_DEG`, `RESULT_LINK_MARGIN_DB` |
 | `BOND_*` / `CONFIG_*` | `manuscript/config.yaml` metadata | `BOND_TITLE`, `BOND_CODENAME`, `CONFIG_KEYWORDS` |
-| environment | the render environment | `PYTHON_VERSION`, `GENERATION_TIMESTAMP` |
+| environment | the render environment | `PYTHON_VERSION`, `SOURCE_DATE` |
 
 **The rule: never type a number.** If a value is not yet a token, add it to
 `_compute_mission_metrics()` first. `tests/test_manuscript_variables.py` fails
@@ -36,10 +36,14 @@ here.
 ## Figures
 
 Pandoc-crossref syntax. Define with `{#fig:label}` on the image, reference with
-`{@fig:label}`:
+`[@fig:label]` — square brackets, the same citation form as a bibliography key.
+This guide previously specified the brace form, which pandoc-crossref does not
+recognise; four references in §3 were written that way and would have rendered
+as literal braces. `tests/test_manuscript_crossrefs.py` now rejects the brace
+form in the sections *and* in this guide.
 
 ```markdown
-The depth-time profile is shown in Figure {@fig:dive_profile}.
+The depth-time profile is shown in Figure [@fig:dive_profile].
 
 ![ATAC underwater retrieval dive profile](dive_profile.png){#fig:dive_profile}
 ```
@@ -73,7 +77,7 @@ BibTeX keys from `references.bib`, cited as `[@shamir1979share]`. Every entry
 must be a real, checkable publication — real authors, real title, real year.
 A reference you cannot verify should be removed, not shipped.
 
-Current keys: `shamir1979share`, `reed1960polynomial`, `haldane1908relation`,
+Current keys: `shamir1979share`, `reed1960polynomial`, `boycott1908prevention`,
 `dijkstra1959note`, `hart1968formal`, `thorp1967analytic`, `urick1983principles`,
 `buhlmann1984decompression`, `berlekamp1968algebraic`, `blakley1979safeguarding`.
 

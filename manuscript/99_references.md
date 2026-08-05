@@ -1,8 +1,15 @@
 # References
 
-Every entry below is a real, checkable publication and corresponds to a key in
-`references.bib`. Each is cited because this package implements the model it
-describes, not to decorate the bibliography.
+Every entry below corresponds to a key in `references.bib`, and every key is
+cited from the numbered prose — both directions are enforced by
+`tests/test_manuscript_crossrefs.py`, so an uncited entry or an undefined
+citation fails the suite. Each is cited because this package implements the
+model it describes, not to decorate the bibliography.
+
+What the tests cannot check is whether each entry is a real publication with
+the details given; that was verified by hand, and one entry was found wrong and
+corrected (see *Decompression modelling* below). Treat the bibliographic
+details as human-verified, not machine-verified.
 
 ## Secret sharing and key escrow
 
@@ -28,9 +35,15 @@ describes, not to decorate the bibliography.
 
 ## Decompression modelling
 
-- Haldane, J. S. (1908). The relation of the action of carbonic oxide to oxygen
-  tension. *Journal of Physiology*, 37, 355. — The compartmental
-  exponential-saturation model behind `underwater_retrieval.HaldaneModel`.
+- Boycott, A. E., Damant, G. C. C., & Haldane, J. S. (1908). The prevention of
+  compressed-air illness. *The Journal of Hygiene*, 8(3), 342–443. — The
+  compartmental exponential-saturation model behind
+  `underwater_retrieval.HaldaneModel`. (Earlier drafts of this bibliography
+  cited "Haldane, J. S. (1908), The relation of the action of carbonic oxide to
+  oxygen tension, *Journal of Physiology*, 37, 355" for this model. That entry
+  was wrong twice over: its bibliographic details did not match any Haldane
+  paper, and the carbon-monoxide work it half-named contains no decompression
+  model. This is the paper the model actually comes from.)
 - Bühlmann, A. A. (1984). *Decompression–Decompression Sickness*.
   Springer-Verlag, Berlin. — The modern multi-compartment formulation with
   M-value ceilings that the staged-ascent scheduler follows in principle.

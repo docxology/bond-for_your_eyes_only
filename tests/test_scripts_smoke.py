@@ -83,6 +83,79 @@ def test_extra_cli_args_are_ignored():
     assert json.loads(proc.stdout)["goal"] == "primary goal"
 
 
+def _tree_bytes(root: Path) -> dict[str, bytes]:
+    return {str(p.relative_to(root)): p.read_bytes() for p in sorted(root.rglob("*")) if p.is_file()}
+
+
+def test_regenerating_the_artifact_tree_is_byte_identical(tmp_path):
+    """The determinism claim, verified end to end by real regeneration.
+
+    This is the test whose absence let the claim stand while being false: the
+    only determinism coverage was `generate_variables(now=<fixed>)`, which
+    pinned the timestamp it was supposed to be checking. Running the real
+    orchestrator twice into two roots and diffing every byte — JSON, resolved
+    manuscript sections, and the four PNGs — is the claim as stated.
+    """
+    first, second = tmp_path / "run_a", tmp_path / "run_b"
+    for root in (first, second):
+        proc = _run_script("z_generate_manuscript_variables.py", "--output-root", str(root))
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+
+    a, b = _tree_bytes(first), _tree_bytes(second)
+    assert sorted(a) == sorted(b)
+    assert len(a) >= 14, f"expected the full artifact set, got {sorted(a)}"
+    differing = sorted(name for name in a if a[name] != b[name])
+    assert differing == [], f"regeneration is not byte-identical: {differing}"
+
+
+def test_no_wall_clock_value_reaches_a_persisted_artifact(tmp_path):
+    """Negative control for the determinism fix: today's date must not appear.
+
+    A regeneration could be byte-identical within one second and still be
+    wall-clock-derived. The build stamp is the declared `paper.date`, so unless
+    that happens to be today, the current date must be absent from the tree.
+    """
+    import datetime as _dt
+
+    from for_your_eyes_only import manuscript_variables as mv
+
+    config = mv.load_manuscript_config(PACKAGE_ROOT / "manuscript" / "config.yaml")
+    declared = str(config["paper"]["date"])
+    today = _dt.datetime.now(_dt.timezone.utc).date().isoformat()
+    if today == declared:
+        pytest.skip("declared paper.date is today; the control cannot distinguish the two")
+
+    root = tmp_path / "run"
+    proc = _run_script("z_generate_manuscript_variables.py", "--output-root", str(root))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    hits = [name for name, blob in _tree_bytes(root).items() if today.encode() in blob]
+    assert hits == [], f"wall-clock date {today} leaked into persisted artifacts: {hits}"
+    # ...and the deterministic stamp really is in there, so the check above is
+    # not passing merely because no date is written at all.
+    assert any(declared.encode() in blob for blob in _tree_bytes(root).values())
+
+
+def test_source_date_epoch_overrides_the_declared_date(tmp_path):
+    """The reproducible-builds override is honoured (and is a real seam)."""
+    root = tmp_path / "run"
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(PACKAGE_ROOT / "scripts" / "z_generate_manuscript_variables.py"),
+            "--output-root",
+            str(root),
+        ],
+        cwd=PACKAGE_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "SOURCE_DATE_EPOCH": "1000000000"},
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    data = json.loads((root / "data" / "manuscript_variables.json").read_text(encoding="utf-8"))
+    assert data["SOURCE_DATE"] == "2001-09-09T01:46:40+00:00"
+
+
 def test_unknown_phase_raises():
     """run_phase rejects a phase outside the frozen five-stage protocol."""
     import sys as _sys

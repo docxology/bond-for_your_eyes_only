@@ -73,6 +73,11 @@ mission:
     frequency_khz: 15.0
     range_m: 3500.0
     detection_threshold_db: 8.0
+    # Ambient-noise term: NL is computed as noise_level(sea_state), not typed
+    # as a dB literal. Spreading is the exponent n in 10*n*log10(r):
+    # 1.0 = cylindrical (shallow-water waveguide), 2.0 = spherical.
+    sea_state: 1.0
+    spreading: 1.0
 
 # Environment / reproducibility
 render:

@@ -56,6 +56,7 @@ __all__ = [
     "ATAC_LINK",
     "ATAC_LINK_RANGE_M",
     "ATAC_MISSION",
+    "ATAC_SEA_STATE",
     "CUSTODIANS",
     "ESCROW_SHARES",
     "ESCROW_THRESHOLD",
@@ -72,6 +73,8 @@ __all__ = [
     "build_gadgets",
     "canonical_mission",
     "key_fingerprint",
+    "mission_succeeded",
+    "recovery_code_label",
 ]
 
 #: Mission identity for this film.
@@ -93,17 +96,22 @@ RECOVERY_CODE_SYMBOLS = 6
 ROUTE_ORIGIN = "corfu"
 ROUTE_DESTINATION = "wreck_site"
 ROUTE_RISK_WEIGHT = 1.0
+#: Sea state assumed for the uplink's ambient-noise term (0 = glassy calm).
+ATAC_SEA_STATE = 1.0
 #: Acoustic link configuration for the ATAC underwater uplink. The wreck
 #: uplink is a shallow-water horizontal channel (range >> depth), so it uses
-#: cylindrical spreading (spreading=1.0). Tuned so the 3.5 km operating range
+#: cylindrical spreading — the exponent ``n = 1`` in ``10*n*log10(r)``, i.e.
+#: 10 dB of geometric loss per decade of range. The ambient noise term is
+#: computed from :data:`ATAC_SEA_STATE` rather than typed as a dB literal, so
+#: ``NL`` has a stated sea state behind it. Tuned so the 3.5 km operating range
 #: closes with margin and max_range is interior to the plan.
 ATAC_LINK = acoustic_link.AcousticLink(
     frequency_khz=15.0,
     source_level_db=145.0,
-    noise_level_db=55.0,
+    noise_level_db=acoustic_link.noise_level(ATAC_SEA_STATE),
     directivity_index_db=10.0,
     detection_threshold_db=8.0,
-    spreading=1.0,
+    spreading=acoustic_link.CYLINDRICAL_SPREADING,
 )
 #: Operating range (m) at which the link budget is evaluated (wreck uplink).
 ATAC_LINK_RANGE_M = 3500.0
@@ -235,6 +243,37 @@ def canonical_mission() -> CanonicalMission:
     )
 
 
+def recovery_code_label() -> str:
+    """Return the erasure geometry as ``"k-of-n"`` — data symbols of code symbols.
+
+    Derived from the constants rather than typed as a literal: the plan step
+    previously advertised ``"6-of-4"``, which reads the geometry backwards (it
+    would mean six symbols required out of four stored) and no gate caught it
+    because it was a free-text string.
+    """
+    return f"{RECOVERY_DATA_SYMBOLS}-of-{RECOVERY_CODE_SYMBOLS}"
+
+
+def mission_succeeded(scenario: CanonicalMission) -> bool:
+    """Return whether every stage of ``scenario`` met its own success condition.
+
+    This is the derivation behind :attr:`MissionOutcome.success`, which was
+    previously the literal ``True``. A stapled literal made
+    ``scripts/00_preflight.py``'s ``mission_success`` verdict unfalsifiable:
+    no input could turn it red. Every clause below is a measured property of
+    the computed scenario, so a stage that stopped working flips the verdict.
+    """
+    return bool(
+        scenario.fingerprint_match
+        and list(scenario.recovery_recovered) == list(scenario.recovery_data)
+        and scenario.retrieval.target_reachable
+        and scenario.route.path
+        and scenario.route.path[-1] == ROUTE_DESTINATION
+        and scenario.fire.feasible
+        and scenario.link_budget.closes
+    )
+
+
 class MissionProvider:  # noqa: N801 — class name fixed by the discovery contract
     """Deterministic ATAC mission provider implementing the frozen protocol."""
 
@@ -297,7 +336,7 @@ class MissionProvider:  # noqa: N801 — class name fixed by the discovery contr
                     action="release_key",
                     params={"quorum": ESCROW_THRESHOLD, "asset": brief.assets[0].name},
                 ),
-                Step(name="key_recovery", action="recover_erasure", params={"code": "6-of-4"}),
+                Step(name="key_recovery", action="recover_erasure", params={"code": recovery_code_label()}),
                 Step(
                     name="underwater_retrieval",
                     action="retrieval_planner.plan",
@@ -387,7 +426,10 @@ class MissionProvider:  # noqa: N801 — class name fixed by the discovery contr
             route.path,
         )
         return MissionOutcome(
-            success=True,
+            # Derived from the computed scenario, never stapled — see
+            # `mission_succeeded`. The preflight verdict of the same name is
+            # only meaningful because this value can be False.
+            success=mission_succeeded(sc),
             results=results,
             provenance=Provenance(
                 package_version=_PACKAGE_VERSION,

@@ -13,12 +13,20 @@ Real models behind the code:
   to a destination over non-negative edge weights. Cost is a configurable
   blend of distance and risk (``risk_weight``), so the planner can prefer the
   safe passage over the shortest one.
-* **A*** : when a straight-line heuristic is provided, the search uses the
-  admissible lower bound ``distance / max_speed`` to prune, returning the same
-  optimal path faster — and deterministically.
+* **A*** : the search uses the straight-line (Euclidean) distance to the goal
+  as an admissible heuristic — it never overestimates the remaining cost,
+  because cost is distance plus a non-negative risk term — so it prunes while
+  returning the same optimal path, deterministically.
 
 The graph is deliberately small and explicit (real Ionian geography), so
 verification is by inspection as well as by test.
+
+Scope note on ``risk_weight``: it always changes the *cost* of a route, but on
+the shipped Ionian graph it never changes the *choice* of route — the
+least-distance and least-risk corridors coincide for every node pair (pinned by
+``tests/test_island_routing.py::test_ionian_graph_route_is_risk_invariant``).
+The mechanism itself is exercised on an explicit two-option graph in the same
+test module, where raising the weight does flip the chosen path.
 """
 
 from __future__ import annotations

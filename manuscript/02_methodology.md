@@ -5,7 +5,9 @@ mission modules.
 
 ## Key escrow and recovery
 
-The ATAC key is escrowed using **Shamir's secret-sharing scheme** over the
+The ATAC key is escrowed using **Shamir's secret-sharing scheme**
+[@shamir1979share] — independently co-discovered the same year by Blakley via
+intersecting hyperplanes [@blakley1979safeguarding] — over the
 finite field $\mathrm{GF}(p)$ with $p = 2^{61} - 1$. A random polynomial
 
 $$f(x) = a_0 + a_1 x + \cdots + a_{k-1} x^{k-1} \pmod{p}$$
@@ -42,7 +44,7 @@ key can come from and no configuration file can claim a different one.
 
 To survive the loss or corruption of an individual stored fragment, the
 released key is also protected by a **systematic Reed–Solomon-style erasure
-code over GF(p)**. The key is treated as $k = ${{RESULT_RECOVERY_DATA_SYMBOLS}}
+code over GF(p)** [@reed1960polynomial; @berlekamp1968algebraic]. The key is treated as $k = ${{RESULT_RECOVERY_DATA_SYMBOLS}}
 data symbols; a generator polynomial is evaluated at
 $n = ${{RESULT_RECOVERY_CODE_SYMBOLS}} distinct field points, producing those
 code symbols. Because any square Vandermonde subsystem is invertible over a
@@ -61,8 +63,8 @@ subsystem is the general case.
 ## Underwater retrieval planning
 
 The device rests on the seabed at depth $d$ under a horizontal current
-$(u, v)$. A **Haldane-style tissue model** — a set of compartments each with
-half-time $t_{1/2}$ — drives the decompression schedule. Compartment pressure
+$(u, v)$. A **Haldane-style tissue model** [@boycott1908prevention] — a set of
+compartments each with half-time $t_{1/2}$ — drives the decompression schedule. Compartment pressure
 relaxes exponentially toward the ambient pressure with time constant
 $\tau = t_{1/2}/\ln 2$.
 
@@ -76,7 +78,8 @@ surface offset of ({{RESULT_SURFACE_OFFSET_E}}, {{RESULT_SURFACE_OFFSET_N}}) m
 **Decompression ceiling.** Each compartment has an M-value ceiling; the
 no-decompression bottom time is the exposure at which the limiting compartment
 first saturates to its ceiling,
-$t_i = \tau_i \ln\frac{P_{amb}-1}{P_{amb}-M_i}$.
+$t_i = \tau_i \ln\frac{P_{amb}-1}{P_{amb}-M_i}$, in the multi-compartment form
+of [@buhlmann1984decompression].
 
 We state the boundary of this model plainly, because it is easy to overread.
 The ascent is staged in **fixed-depth steps at a fixed rate**: the staging is
@@ -93,8 +96,17 @@ The Ionian islands are modelled as a **weighted undirected graph** with fixed
 node positions; each edge carries a distance (nm) and a risk weight. Routing
 finds the minimum-*cost* path, where edge cost blends distance and risk:
 $c = d + \lambda r$ with a configurable risk penalty $\lambda$. The planner
-uses **Dijkstra's algorithm** (or A* with a straight-line admissible
-heuristic), returning the same optimum deterministically.
+uses **Dijkstra's algorithm** [@dijkstra1959note], or A* with a straight-line
+admissible heuristic [@hart1968formal], returning the same optimum
+deterministically.
+
+**What $\lambda$ does and does not do here.** Raising $\lambda$ always raises
+the cost of a route, but on the shipped Ionian graph it never changes which
+route is chosen: the least-distance and least-risk corridors coincide for every
+one of the 28 node pairs. So this package demonstrates the *cost* blend, not
+risk-driven path selection; the selection mechanism is exercised on a separate
+two-option graph in the test suite. Read the canonical route below as the
+shortest route, which on this graph is also the safest.
 
 The canonical insertion route is {{RESULT_ROUTE}} — {{RESULT_ROUTE_HOPS}} hops,
 {{RESULT_ROUTE_DISTANCE}} nm, total cost {{RESULT_ROUTE_COST}}.
@@ -118,8 +130,14 @@ module reports the closest-approach distance instead
 
 The recovered device uplinks targeting data acoustically to a surface relay.
 **Transmission loss** combines geometric spreading with frequency-dependent
-absorption via **Thorp's formula** (dB/km). Received SNR is
-$\text{SNR} = \text{SL} - \text{TL} - \text{NL} + \text{DI}$ and the link
+absorption via **Thorp's formula** (dB/km) [@thorp1967analytic]. Geometric
+spreading is $10 n \log_{10} r$ for a spreading exponent $n$ — $n = 2$
+spherical, $n = 1$ cylindrical — and the wreck uplink is modelled as a
+shallow-water horizontal channel, so it uses $n = 1$. The ambient noise term NL
+is computed from a declared sea state rather than entered as a decibel literal.
+Received SNR is
+$\text{SNR} = \text{SL} - \text{TL} - \text{NL} + \text{DI}$
+[@urick1983principles] and the link
 *closes* when SNR exceeds the detection threshold $\text{DT}$. The **margin**
 is $\text{SNR} - \text{DT}$ — the signal in hand beyond the point of
 detectability — so closure is exactly a non-negative margin. At the

@@ -40,7 +40,7 @@ The retrieval dive to {{RESULT_WRECK_DEPTH}} m completes in
 offset is ({{RESULT_SURFACE_OFFSET_E}}, {{RESULT_SURFACE_OFFSET_N}}) m; the
 target is reachable within the operational envelope
 ({{RESULT_TARGET_REACHABLE}}). The depth-time profile is shown in
-Figure {@fig:dive_profile}.
+Figure [@fig:dive_profile].
 
 ![ATAC underwater retrieval dive profile](dive_profile.png){#fig:dive_profile}
 
@@ -48,9 +48,14 @@ Figure {@fig:dive_profile}.
 
 The least-cost insertion route from the staging base to the wreck site is
 {{RESULT_ROUTE}} ({{RESULT_ROUTE_HOPS}} hops, {{RESULT_ROUTE_DISTANCE}} nm,
-cost {{RESULT_ROUTE_COST}}). The route cost intentionally blends distance and
-risk, favouring safe passages without abandoning the shortest corridor. The
-Ionian graph and planned route are shown in Figure {@fig:island_graph}.
+cost {{RESULT_ROUTE_COST}}). The route cost blends distance and risk, but on
+this graph that blend never changes the answer: for all 28 node pairs the route
+chosen at risk weight 0 is the route chosen at risk weight 50, because the
+Ionian island chain's safest corridor is also its shortest. The reported route
+is therefore the shortest route, and this section claims nothing more for it.
+The risk term is exercised as a mechanism on a purpose-built two-option graph
+in the test suite, not here. The Ionian graph and planned route are shown in
+Figure [@fig:island_graph].
 
 ![ATAC Ionian insertion route](island_graph.png){#fig:island_graph}
 
@@ -61,7 +66,7 @@ The ATAC fire-control solution for the canonical contact is feasible
 s, a lead angle of {{RESULT_FIRE_LEAD_DEG}}° and a weapon course of
 {{RESULT_FIRE_COURSE_DEG}}°; where a close is not achievable, the module
 reports the closest-approach distance ({{RESULT_FIRE_CLOSEST_M}} m). The
-intercept geometry is shown in Figure {@fig:targeting_geometry}.
+intercept geometry is shown in Figure [@fig:targeting_geometry].
 
 ![ATAC targeting intercept geometry](targeting_geometry.png){#fig:targeting_geometry}
 
@@ -73,6 +78,6 @@ At the {{RESULT_LINK_RANGE_M}}-m operating range the ATAC uplink receives
 {{RESULT_LINK_MARGIN_DB}} dB; the link closes ({{RESULT_LINK_CLOSES}}) with a
 maximum acoustic range of {{RESULT_LINK_MAX_RANGE_M}} m. Because the operating
 range sits inside that maximum, the uplink is not run at the edge of its
-budget. The SNR-vs-range curve is shown in Figure {@fig:acoustic_link}.
+budget. The SNR-vs-range curve is shown in Figure [@fig:acoustic_link].
 
 ![ATAC underwater acoustic link budget](acoustic_link.png){#fig:acoustic_link}

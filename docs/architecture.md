@@ -95,8 +95,12 @@ operational envelope.
 
 A weighted undirected graph of Ionian harbours with fixed positions on a
 nautical-mile grid. Edges carry a distance and a risk weight; cost is
-`distance + risk_weight * risk`, so the planner can be told to prefer a safe
-passage over a short one.
+`distance + risk_weight * risk`, so a planner *can* be told to prefer a safe
+passage over a short one — but on this graph it never has to: the safest and
+shortest corridors coincide for all 28 node pairs, so `risk_weight` changes
+route cost and never route choice. Both halves are pinned in
+`tests/test_island_routing.py`, the selection mechanism on a separate
+two-option graph.
 
 `plan_route` runs **Dijkstra**, or **A\*** with the straight-line admissible
 heuristic when `use_astar=True` — the same optimum, reached with less
@@ -128,9 +132,13 @@ reports the useful quantity: how near the weapon gets.
 ### `acoustic_link.py` — the uplink budget
 
 The sonar equation. **Thorp's formula** gives frequency-dependent absorption in
-dB/km; `transmission_loss` adds geometric spreading. Received SNR is
-`SL - TL - NL + DI`, and the link *closes* when SNR reaches the detection
-threshold `DT`.
+dB/km; `transmission_loss` adds geometric spreading as `10 * n * log10(r)` for
+a spreading *exponent* `n` (`SPHERICAL_SPREADING = 2.0` → 20 dB per decade,
+`CYLINDRICAL_SPREADING = 1.0` → 10 dB per decade). The mission's wreck uplink
+is a shallow-water horizontal channel and uses the cylindrical exponent.
+Received SNR is `SL - TL - NL + DI`, and the link *closes* when SNR reaches the
+detection threshold `DT`. `NL` is not a hand-typed literal: it is
+`noise_level(ATAC_SEA_STATE)`, so the declared sea state is what sets it.
 
 `LinkBudget` carries `detection_threshold_db` alongside the SNR so `margin_db`
 is a real margin (`SNR - DT`, negative when the link is short) rather than a

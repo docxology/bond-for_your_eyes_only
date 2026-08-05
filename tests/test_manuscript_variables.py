@@ -34,14 +34,41 @@ def test_generate_variables_strict_mode():
 
 
 def test_generate_variables_deterministic():
-    a = mv.generate_variables(now=lambda: datetime(2026, 1, 1, tzinfo=timezone.utc))
-    b = mv.generate_variables(now=lambda: datetime(2026, 1, 1, tzinfo=timezone.utc))
-    assert a == b
+    """Two default calls agree — with no injected clock, which is the point.
+
+    Injecting a fixed `now` into both sides (as this test used to) pins the one
+    value that was actually varying, so it could not have caught the wall-clock
+    default. These calls use the production path.
+    """
+    assert mv.generate_variables() == mv.generate_variables()
 
 
 def test_generate_variables_timestamp_injectable():
     variables = mv.generate_variables(now=lambda: datetime(2026, 1, 1, tzinfo=timezone.utc))
-    assert variables["GENERATION_TIMESTAMP"] == "2026-01-01T00:00:00+00:00"
+    assert variables["SOURCE_DATE"] == "2026-01-01T00:00:00+00:00"
+
+
+def test_default_source_date_is_the_declared_paper_date():
+    """The default build stamp comes from tracked config, not the wall clock."""
+    config = mv.load_manuscript_config()
+    declared = str(config["paper"]["date"])
+    assert mv.generate_variables()["SOURCE_DATE"] == f"{declared}T00:00:00+00:00"
+
+
+def test_source_date_honours_source_date_epoch(monkeypatch):
+    monkeypatch.setenv(mv.SOURCE_DATE_EPOCH, "1000000000")
+    config = mv.load_manuscript_config()
+    assert mv.source_date(config) == datetime(2001, 9, 9, 1, 46, 40, tzinfo=timezone.utc)
+    monkeypatch.setenv(mv.SOURCE_DATE_EPOCH, "not-an-int")
+    with pytest.raises(ValueError, match="POSIX timestamp"):
+        mv.source_date(config)
+
+
+def test_source_date_requires_a_declared_date():
+    with pytest.raises(ValueError, match="paper.date"):
+        mv.source_date({"paper": {}})
+    with pytest.raises(ValueError, match="paper.date"):
+        mv.source_date({})
 
 
 def test_load_manuscript_config_missing_raises(tmp_path):

@@ -38,8 +38,7 @@ dependency is not.
 
 Fixed seed, fixed field, fixed graph, fixed link configuration. Tests assert on
 exact values where the mathematics is exact and `pytest.approx` where it is
-floating point. No test depends on wall-clock time; `GENERATION_TIMESTAMP` is
-injected precisely so that it can be pinned.
+floating point.
 
 Determinism is itself tested: encoding the same data twice must produce
 identical symbols, splitting the same key with the same seed must produce
@@ -47,14 +46,34 @@ identical shares, and different seeds must produce different ones. That last
 assertion matters — without it, a scheme that ignored its seed entirely would
 pass the first two.
 
+**Pinning the variable is not testing it.** The package's determinism claim was
+false for a while and the suite could not see it. `SOURCE_DATE` was
+`datetime.now()`, so regenerating `output/` wrote different bytes on every run
+— but the only determinism test called `generate_variables(now=<fixed>)`,
+injecting the one value that varied. The fix has two halves: the stamp is now
+resolved from tracked inputs (`SOURCE_DATE_EPOCH`, else the declared
+`paper.date`), and `test_scripts_smoke.py` runs the real generator twice into
+two roots and diffs every byte of both trees, with a control asserting today's
+date appears nowhere in the output. If you must inject a value to make a test
+deterministic, ask what the injection is hiding.
+
 ## What we insist on
 
-**Positive controls.** A test that something is rejected is worthless unless
-something is also accepted, and vice versa. `verify_share` is tested to accept
-authentic shares *and* reject tampered ones. `test_config_consistency.py`
-carries an explicit positive control asserting that a wrong declared value does
-*not* compare equal, so the whole file cannot pass by comparing a thing to
-itself.
+**Positive controls, and the control must touch the mechanism.** A test that
+something is rejected is worthless unless something is also accepted, and vice
+versa. `verify_share` is tested to accept authentic shares *and* reject
+tampered ones.
+
+`test_config_consistency.py`'s control is worth spelling out, because it was
+itself hollow. It used to build `dict(declared['escrow'], threshold=THRESHOLD +
+1)` and assert `wrong['threshold'] != THRESHOLD` — that is `X + 1 != X`, true of
+every integer, touching neither the config loader nor the comparison. The whole
+file could have been self-comparing and that control would still have been
+green. It now writes a config file with one wrong value, loads it through
+`load_manuscript_config`, calls the same `_check_escrow_block` the real test
+calls, and requires it to raise — then re-runs it on an unmutated round-trip so
+the failure is attributable to the wrong value rather than to serialisation.
+A control that does not run the mechanism is decoration with a reassuring name.
 
 **The general case, not the easy case.** The erasure code's entire purpose is
 surviving arbitrary fragment loss. Recovering from the *leading* `k` fragments
@@ -67,6 +86,16 @@ hashing the released key and comparing. It was previously the literal `True`,
 which meant `scripts/00_preflight.py`'s escrow verdict could not fail — it
 would have reported `[PASS]` no matter what release returned.
 
+The same defect survived one file over: `execute()` returned
+`MissionOutcome(success=True, ...)`, so the preflight's `mission_success`
+verdict was unfalsifiable by construction. `success` is now
+`mission_succeeded(scenario)`, a conjunction of six measured properties of the
+computed run, and the test degrades the real frozen `CanonicalMission` one
+field at a time (via `dataclasses.replace`) requiring each degradation to flip
+the verdict. Verified by hand as well: raising the link's detection threshold
+to 800 dB makes `scripts/00_preflight.py` print `[FAIL] mission_success` and
+exit 1.
+
 **Guards that fire.** Every validation branch in `src/` is reached by a test
 with real inputs: non-invertible modular inverses via a composite modulus, a
 singular Vandermonde system via dependent rows, duplicate share points via a
@@ -77,7 +106,21 @@ in which case delete it — or unprotected.
 **Meaningful assertions.** `assert x > y * 0` is a disguised `assert x > 0` and
 was replaced with a comparison against the actual detection threshold. A test
 named `test_unknown_phase_exits_2` that asserted `returncode == 0` was replaced
-with one that drives the real unknown-phase path and asserts exit code 2.
+with one that drives the real unknown-phase path and asserts exit code 2. A
+test docstringed "higher risk weight can change the chosen path" asserted
+`high.total_cost >= low.distance_nm` and `isinstance(high.path, tuple)` — the
+first holds for any non-negative weight on any graph and the second cannot
+fail; worse, the behaviour it named is not true of the shipped graph at all.
+It was replaced by a two-option graph on which the path demonstrably flips,
+plus an explicit pin that the Ionian route is risk-invariant.
+
+**Ordering is weaker than the law.** `cylindrical < spherical` passed while the
+spreading term was `20*n*log10(r)` — which made the constant labelled spherical
+twice spherical and the one labelled cylindrical exactly spherical. Any
+increasing function of the parameter satisfies an ordering test. The
+replacement subtracts absorption to isolate the geometry and asserts the
+decade slope itself: 20 dB for `SPHERICAL_SPREADING`, 10 dB for
+`CYLINDRICAL_SPREADING`.
 
 ## Documentation is under test
 
@@ -115,12 +158,13 @@ the measurement is whatever the command prints today.
 | `test_key_escrow.py` | Shamir round-trips, commitments, quorum and tamper rejection, custody chaining |
 | `test_key_recovery.py` | Encode/recover round-trips, exhaustive any-`k` recovery, checksum corruption detection |
 | `test_underwater_retrieval.py` | Tissue saturation, no-decompression limits, descent/ascent scheduling, drift |
-| `test_island_routing.py` | Route optimality, risk sensitivity, Dijkstra/A* agreement |
+| `test_island_routing.py` | Route optimality, Dijkstra/A* agreement, risk-driven path selection on a two-option graph, and the Ionian graph's risk-invariance |
 | `test_targeting.py` | Intercept feasibility, lead-angle geometry, closest-approach fallback |
 | `test_acoustic_link.py` | Thorp absorption, path loss, SNR monotonicity, margin semantics, bisection |
 | `test_mission.py` | Frozen protocol conformance, gadget registry, provenance, canonical scenario |
 | `test_figures.py` | Real PNG rendering, deterministic output |
-| `test_manuscript_variables.py` | Token generation and strict resolution |
+| `test_manuscript_variables.py` | Token generation, strict resolution, deterministic build stamp |
+| `test_manuscript_crossrefs.py` | Bib keys ↔ citations, figure labels ↔ references ↔ generators |
 | `test_config_consistency.py` | Declared config pinned to executed constants |
 | `test_error_paths.py` | Every validation guard, driven by real inputs |
-| `test_scripts_smoke.py` | Real subprocess runs of each phase CLI |
+| `test_scripts_smoke.py` | Real subprocess runs of each phase CLI; byte-identical regeneration |

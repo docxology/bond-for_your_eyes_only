@@ -8,8 +8,11 @@ ratio, and the maximum range at which the link closes.
 Real models behind the code:
 
 * **Transmission loss** — geometric spreading plus frequency-dependent
-  absorption. Spherical spreading contributes ``20 * log10(r)`` dB; absorption
-  follows **Thorp's formula**, giving absorption in dB/km from the carrier
+  absorption. Following Urick's convention the geometric term is
+  ``10 * n * log10(r)`` for a spreading *exponent* ``n``: ``n = 2`` is spherical
+  (``20 * log10(r)``), ``n = 1`` is cylindrical (``10 * log10(r)``), and
+  ``n = 1.5`` is the common practical intermediate. Absorption follows
+  **Thorp's formula**, giving absorption in dB/km from the carrier
   frequency (kHz):
   ``alpha = 0.11 f^2/(1+f^2) + 44 f^2/(4100+f^2) + 2.75e-4 f^2 + 0.003``.
 * **Link budget** — received SNR in dB: ``SNR = SL - TL - NL + DI`` (source
@@ -30,6 +33,8 @@ import math
 from dataclasses import dataclass
 
 __all__ = [
+    "CYLINDRICAL_SPREADING",
+    "SPHERICAL_SPREADING",
     "SPREADING",
     "AcousticLink",
     "LinkBudget",
@@ -41,8 +46,14 @@ __all__ = [
     "transmission_loss",
 ]
 
-#: Spreading coefficient (2 = spherical point-source spreading).
+#: Geometric spreading *exponent* ``n`` in ``10 * n * log10(r)``.
+#: ``2.0`` = spherical point-source spreading (20*log10 r), ``1.0`` =
+#: cylindrical waveguide spreading (10*log10 r).
 SPREADING = 2.0
+#: Named spreading exponents, so a caller can say what it means rather than
+#: passing a bare float that a comment has to explain.
+SPHERICAL_SPREADING = 2.0
+CYLINDRICAL_SPREADING = 1.0
 
 
 def thorp_absorption(frequency_khz: float) -> float:
@@ -60,15 +71,17 @@ def thorp_absorption(frequency_khz: float) -> float:
 def transmission_loss(range_m: float, frequency_khz: float, *, spreading: float = SPREADING) -> float:
     """Return geometric + absorption path loss (dB) over ``range_m``.
 
-    ``20*spreading*log10(range_m)`` geometric spreading plus
-    ``absorption(dB/km) * range_km`` absorption.
+    ``10*spreading*log10(range_m)`` geometric spreading plus
+    ``absorption(dB/km) * range_km`` absorption, where ``spreading`` is the
+    spreading *exponent* (2 spherical, 1 cylindrical, 1.5 practical). A decade
+    of range therefore costs exactly ``10*spreading`` dB of geometric loss.
     """
     if range_m <= 0:
         raise ValueError("range must be > 0 m")
     if spreading <= 0:
         raise ValueError("spreading must be positive")
     range_km = range_m / 1000.0
-    geometric = 20.0 * spreading * math.log10(range_m)
+    geometric = 10.0 * spreading * math.log10(range_m)
     absorption = thorp_absorption(frequency_khz) * range_km
     return geometric + absorption
 
@@ -78,7 +91,14 @@ def noise_level(sea_state: float = 1.0) -> float:
 
     A simple, smooth model of ambient noise growing with sea state (typical
     values run ~55-75 dB for mild seas at mid frequencies).
+
+    This is the producer of :attr:`AcousticLink.noise_level_db`: the mission's
+    link is built as ``noise_level(ATAC_SEA_STATE)`` rather than carrying a
+    hand-typed dB literal, so the ``NL`` term of the sonar equation is a
+    computed quantity with a stated sea state behind it.
     """
+    if sea_state < 0:
+        raise ValueError("sea_state must be >= 0")
     return 55.0 + 12.0 * math.log10(1.0 + sea_state)
 
 

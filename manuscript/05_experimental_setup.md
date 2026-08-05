@@ -18,7 +18,11 @@ at {{RESULT_LINK_RANGE_M}} m.
   {{BOND_VERSION}}
 * Title: {{BOND_TITLE}}
 * Keywords ({{CONFIG_NUM_KEYWORDS}}): {{CONFIG_KEYWORDS}}
-* Generated: {{GENERATION_TIMESTAMP}}
+* Source date (deterministic build stamp, not the time of rendering):
+  {{SOURCE_DATE}}
 
 All computations are deterministic: fixed seeds, no untracked random draws, no
-wall-clock dependence in persisted artifacts.
+wall-clock dependence in persisted artifacts. The stamp above is the declared
+`paper.date` (or `SOURCE_DATE_EPOCH` when set), so re-rendering this section
+tomorrow produces the same bytes; it deliberately does not report when the
+render happened, because that value cannot be both honest and reproducible.

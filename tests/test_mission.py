@@ -72,6 +72,51 @@ def test_execute_produces_deterministic_results():
     assert outcome.provenance.wall_time_s == 0.0
 
 
+def test_plan_states_the_erasure_geometry_the_right_way_round():
+    """The `key_recovery` step's code label is k-of-n, derived from constants.
+
+    It was the hardcoded string "6-of-4" — the geometry backwards (six required
+    of four stored) — printed verbatim by `scripts/plan.py` with no gate on it.
+    """
+    provider = MissionProvider()
+    step = next(s for s in provider.plan(provider.brief()).steps if s.name == "key_recovery")
+    data, _, code = str(step.params["code"]).partition("-of-")
+    assert int(data) == mission.RECOVERY_DATA_SYMBOLS
+    assert int(code) == mission.RECOVERY_CODE_SYMBOLS
+    # k of n, not n of k: fewer symbols are required than are stored.
+    assert int(data) < int(code)
+    assert step.params["code"] == "4-of-6"
+
+
+def test_mission_success_is_derived_and_can_be_false():
+    """Positive control for the `mission_success` preflight verdict.
+
+    `execute()` used to return `MissionOutcome(success=True, ...)` as a literal,
+    so `scripts/00_preflight.py`'s `[PASS] mission_success` could not fail for
+    any input. `success` is now `mission_succeeded(scenario)`; here the real
+    canonical scenario is degraded — one field at a time, through
+    `dataclasses.replace` on the real frozen dataclass — and each degradation
+    must flip the verdict to False.
+    """
+    import dataclasses
+
+    from for_your_eyes_only.mission import canonical_mission, mission_succeeded
+
+    good = canonical_mission()
+    assert mission_succeeded(good) is True
+
+    degradations = [
+        dataclasses.replace(good, fingerprint_match=False),
+        dataclasses.replace(good, recovery_recovered=tuple(v + 1 for v in good.recovery_recovered)),
+        dataclasses.replace(good, retrieval=dataclasses.replace(good.retrieval, target_reachable=False)),
+        dataclasses.replace(good, route=dataclasses.replace(good.route, path=("corfu", "paxi"))),
+        dataclasses.replace(good, fire=dataclasses.replace(good.fire, feasible=False)),
+        dataclasses.replace(good, link_budget=dataclasses.replace(good.link_budget, closes=False)),
+    ]
+    for i, degraded in enumerate(degradations):
+        assert mission_succeeded(degraded) is False, f"degradation {i} did not flip the verdict"
+
+
 def test_debrief_carries_lessons():
     provider = MissionProvider()
     debrief = provider.debrief(provider.execute(provider.plan(provider.brief())))

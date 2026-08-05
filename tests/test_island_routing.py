@@ -35,14 +35,67 @@ def test_plan_route_astar_equals_dijkstra():
     assert a.total_cost == pytest.approx(d.total_cost)
 
 
-def test_plan_route_risk_sensitivity():
-    """Higher risk weight can change the chosen path (safer route)."""
+def _two_option_graph() -> ir.IslandGraph:
+    """A graph with a short-risky and a long-safe corridor between the same ends.
+
+    Real data, explicit and checkable by hand: base -> beacon -> landing is
+    20 nm at risk 5.0 per leg; base -> channel -> landing is 26 nm at risk 0.1
+    per leg. At risk_weight 0 the short corridor wins by 6 nm; by risk_weight
+    1.0 the risk term (9.8 nm-equivalent) has overtaken it.
+    """
+    nodes = {
+        "base": (0.0, 0.0),
+        "beacon": (5.0, 0.0),
+        "channel": (0.0, 6.0),
+        "landing": (10.0, 0.0),
+    }
+    adjacency = {
+        "base": (ir.Edge("beacon", 10.0, 5.0), ir.Edge("channel", 13.0, 0.1)),
+        "beacon": (ir.Edge("base", 10.0, 5.0), ir.Edge("landing", 10.0, 5.0)),
+        "channel": (ir.Edge("base", 13.0, 0.1), ir.Edge("landing", 13.0, 0.1)),
+        "landing": (ir.Edge("beacon", 10.0, 5.0), ir.Edge("channel", 13.0, 0.1)),
+    }
+    return ir.IslandGraph(nodes=nodes, adjacency=adjacency)
+
+
+def test_risk_weight_changes_the_chosen_path():
+    """The risk term must be able to *decide* a route, not merely price one.
+
+    Asserting `high.total_cost >= low.distance_nm` (the previous assertion)
+    holds for any non-negative risk weight and any graph, including one where
+    `risk_weight` was ignored entirely. This drives the mechanism: the same
+    origin/destination pair must resolve to two different paths.
+    """
+    graph = _two_option_graph()
+    reckless = ir.plan_route(graph, "base", "landing", risk_weight=0.0)
+    cautious = ir.plan_route(graph, "base", "landing", risk_weight=5.0)
+
+    assert reckless.path == ("base", "beacon", "landing")
+    assert cautious.path == ("base", "channel", "landing")
+    assert reckless.path != cautious.path
+    # The safe route is genuinely longer — the planner traded distance for risk.
+    assert cautious.distance_nm > reckless.distance_nm
+
+
+def test_ionian_graph_route_is_risk_invariant():
+    """On the shipped graph, risk never changes the route — only its cost.
+
+    Stated as a pinned fact rather than left implied. The least-distance and
+    least-risk corridors coincide for every node pair in the Ionian graph, so
+    no route in this package demonstrates risk-driven path selection; the
+    mechanism is exercised on `_two_option_graph` instead. If the graph is ever
+    edited so that risk does steer a route, this test fails and the claim in
+    `island_routing`'s module docstring must be revisited.
+    """
     graph = ir.build_ionian_graph()
-    low = ir.plan_route(graph, "corfu", "zakynthos", risk_weight=0.0)
-    high = ir.plan_route(graph, "corfu", "zakynthos", risk_weight=50.0)
-    # risk-averse planner may route via lower-risk corridor; distance may grow
-    assert high.total_cost >= low.distance_nm
-    assert isinstance(high.path, tuple)
+    pairs = [(a, b) for a in sorted(graph.nodes) for b in sorted(graph.nodes) if a < b]
+    assert len(pairs) == 28
+    for origin, destination in pairs:
+        low = ir.plan_route(graph, origin, destination, risk_weight=0.0)
+        high = ir.plan_route(graph, origin, destination, risk_weight=50.0)
+        assert low.path == high.path, f"{origin}->{destination} route changed with risk weight"
+        # Cost still responds to the weight even where the path does not.
+        assert high.total_cost > low.total_cost
 
 
 def test_plan_route_deterministic():
