@@ -96,16 +96,46 @@ def test_link_validation():
 
 def test_canonical_mission_link_closes():
     """The mission's canonical link closes at its operating range with margin."""
-    from for_your_eyes_only.mission import _LINK_RANGE_M, canonical_mission
+    from for_your_eyes_only.mission import ATAC_LINK, ATAC_LINK_RANGE_M, canonical_mission
 
     sc = canonical_mission()
     assert sc.link_budget.closes is True
-    assert sc.link_budget.received_snr_db > sc.link_budget.max_range_m * 0  # positive
+    # A real margin over the threshold, not merely "some positive number".
+    assert sc.link_budget.received_snr_db > ATAC_LINK.detection_threshold_db
+    assert sc.link_budget.margin_db > 0.0
     # operating range < max range (interior closure)
-    assert _LINK_RANGE_M < sc.link_budget.max_range_m
+    assert ATAC_LINK_RANGE_M < sc.link_budget.max_range_m
 
 
-def test_link_budget_margin_property():
-    link = ac.AcousticLink(spreading=1.0)
+def test_link_budget_margin_is_relative_to_threshold():
+    """margin_db is SNR *above* the detection threshold, not the raw SNR."""
+    link = ac.AcousticLink(spreading=1.0, detection_threshold_db=15.0)
     budget = ac.compute_link_budget(link, 500.0)
-    assert budget.margin_db == budget.received_snr_db
+    assert budget.detection_threshold_db == 15.0
+    assert budget.margin_db == pytest.approx(budget.received_snr_db - 15.0)
+    # The margin must not be a restatement of the SNR (the old bug).
+    assert budget.margin_db != budget.received_snr_db
+    # closes is exactly "margin is non-negative".
+    assert budget.closes is (budget.margin_db >= 0.0)
+
+
+def test_margin_is_negative_when_link_does_not_close():
+    """A link short of threshold reports a negative margin, not a positive SNR."""
+    link = ac.AcousticLink(source_level_db=100.0, detection_threshold_db=40.0)
+    budget = ac.compute_link_budget(link, 50_000.0)
+    assert budget.closes is False
+    assert budget.margin_db < 0.0
+
+
+def test_max_link_range_reports_zero_when_link_never_closes():
+    """A link failing at the bracket floor has no coverage — not `lo` metres of it."""
+    link = ac.AcousticLink(source_level_db=1.0, detection_threshold_db=200.0)
+    assert ac.received_snr(link, 10.0) < link.detection_threshold_db
+    assert ac.max_link_range(link) == 0.0
+    assert ac.compute_link_budget(link, 10.0).max_range_m == 0.0
+
+
+def test_max_link_range_returns_bracket_ceiling_when_still_closing():
+    """When the root lies beyond the bracket, `hi` is returned as a lower bound."""
+    link = ac.AcousticLink(source_level_db=10_000.0, detection_threshold_db=0.0)
+    assert ac.max_link_range(link, lo=10.0, hi=5_000.0) == 5_000.0

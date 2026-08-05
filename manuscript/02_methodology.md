@@ -29,7 +29,14 @@ the whole custody history append-only.
 
 **Release.** Release reconstructs the key from a verified quorum and confirms
 it reproduces the escrow's key fingerprint. The recovered key is
-{{RESULT_ESCROW_KEY}} (matches fingerprint: {{RESULT_RECOVERED_MATCH}}).
+{{RESULT_ESCROW_KEY}} (matches fingerprint: {{RESULT_RECOVERED_MATCH}}). The
+match is obtained by recomputing $\mathrm{SHA\text{-}256}(k)$ over the released
+key and comparing it to the stored fingerprint, so the reported value is a
+measurement rather than a restatement of an intention.
+
+**Key derivation.** The escrowed key is derived from the mission seed at import
+time rather than written down as a literal, so there is exactly one place the
+key can come from and no configuration file can claim a different one.
 
 ## Erasure-coded key recovery
 
@@ -43,6 +50,13 @@ field, **any $k$ of the $n$ code symbols reconstruct the key** — the erasure
 property (recovered matches original: {{RESULT_RECOVERY_MATCH}}). An integrity
 checksum detects a corrupted fragment so a bad fragment never silently yields
 a wrong key.
+
+The decoder takes the positions of the surviving fragments explicitly, which is
+what makes the erasure property exercisable rather than merely asserted: a
+decoder hard-wired to the leading $k$ fragments would satisfy the round-trip
+test while being unable to survive the loss of fragment 0. Selecting the
+evaluation points $x_i$ of the actual survivors and solving that Vandermonde
+subsystem is the general case.
 
 ## Underwater retrieval planning
 
@@ -61,8 +75,17 @@ surface offset of ({{RESULT_SURFACE_OFFSET_E}}, {{RESULT_SURFACE_OFFSET_N}}) m
 
 **Decompression ceiling.** Each compartment has an M-value ceiling; the
 no-decompression bottom time is the exposure at which the limiting compartment
-first saturates to its ceiling. The ascent is staged in fixed-depth steps so
-no compartment violates its ceiling.
+first saturates to its ceiling,
+$t_i = \tau_i \ln\frac{P_{amb}-1}{P_{amb}-M_i}$.
+
+We state the boundary of this model plainly, because it is easy to overread.
+The ascent is staged in **fixed-depth steps at a fixed rate**: the staging is
+geometric and does not consult the tissue state. The tissue model computes
+no-decompression limits and ceilings as an independent quantity; it does not
+size the stops. A stage boundary in the reported profile is therefore not a
+decompression obligation, and the profile should not be read as a
+physiologically validated schedule. Wiring the ceiling into the staging is
+recorded as open work rather than claimed as done.
 
 ## Greek-island insertion routing
 
@@ -97,8 +120,17 @@ The recovered device uplinks targeting data acoustically to a surface relay.
 **Transmission loss** combines geometric spreading with frequency-dependent
 absorption via **Thorp's formula** (dB/km). Received SNR is
 $\text{SNR} = \text{SL} - \text{TL} - \text{NL} + \text{DI}$ and the link
-*closes* when SNR exceeds the detection threshold. The maximum range is found
-by deterministic bisection. At the {{RESULT_LINK_RANGE_M}}-m operating range
-the received SNR is {{RESULT_LINK_SNR_DB}} dB (link closes:
-{{RESULT_LINK_CLOSES}}), with a maximum acoustic range of
-{{RESULT_LINK_MAX_RANGE_M}} m.
+*closes* when SNR exceeds the detection threshold $\text{DT}$. The **margin**
+is $\text{SNR} - \text{DT}$ — the signal in hand beyond the point of
+detectability — so closure is exactly a non-negative margin. At the
+{{RESULT_LINK_RANGE_M}}-m operating range the received SNR is
+{{RESULT_LINK_SNR_DB}} dB against a {{RESULT_LINK_THRESHOLD_DB}} dB threshold,
+a margin of {{RESULT_LINK_MARGIN_DB}} dB (link closes:
+{{RESULT_LINK_CLOSES}}).
+
+**Maximum range.** Since SNR falls monotonically with range, the coverage
+radius is the unique root of $\text{SNR}(r) = \text{DT}$, found by bounded
+bisection: {{RESULT_LINK_MAX_RANGE_M}} m. The bracket endpoints are reported
+honestly — a link that already fails at the bracket floor has a coverage radius
+of zero, not a coverage radius equal to the floor, and a link still closing at
+the ceiling returns that ceiling as a lower bound.

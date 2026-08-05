@@ -30,12 +30,15 @@ import math
 from dataclasses import dataclass
 
 __all__ = [
+    "SPREADING",
     "AcousticLink",
     "LinkBudget",
+    "compute_link_budget",
+    "max_link_range",
     "noise_level",
+    "received_snr",
     "thorp_absorption",
     "transmission_loss",
-    "received_snr",
 ]
 
 #: Spreading coefficient (2 = spherical point-source spreading).
@@ -101,7 +104,12 @@ class AcousticLink:
 
 @dataclass(frozen=True)
 class LinkBudget:
-    """The computed link budget at a given range and its closure status."""
+    """The computed link budget at a given range and its closure status.
+
+    ``detection_threshold_db`` is carried alongside the received SNR so the
+    budget is self-describing: :attr:`margin_db` is a real margin rather than a
+    restatement of the SNR, and ``closes`` can be re-derived by any consumer.
+    """
 
     range_m: float
     frequency_khz: float
@@ -109,11 +117,17 @@ class LinkBudget:
     received_snr_db: float
     closes: bool
     max_range_m: float
+    detection_threshold_db: float
 
     @property
     def margin_db(self) -> float:
-        """Received SNR above the detection threshold (share with threshold)."""
-        return self.received_snr_db
+        """Received SNR *above* the detection threshold (negative when short).
+
+        This is the operationally meaningful quantity: how much signal the link
+        has in hand beyond the threshold at which the receiver can detect it.
+        ``closes`` is exactly ``margin_db >= 0``.
+        """
+        return self.received_snr_db - self.detection_threshold_db
 
 
 def received_snr(link: AcousticLink, range_m: float) -> float:
@@ -129,14 +143,21 @@ def max_link_range(link: AcousticLink, *, lo: float = 10.0, hi: float = 200_000.
     """Return the maximum range (m) at which the link closes, by bisection.
 
     The received SNR falls monotonically with range, so the closure point is
-    the unique root of ``received_snr(r) - detection_threshold = 0`` over a
-    log-scaled bracket. Deterministic and bounded.
+    the unique root of ``received_snr(r) - detection_threshold = 0`` over the
+    bracket ``[lo, hi]``. Deterministic and bounded.
+
+    Bracket endpoints are reported honestly rather than as a closure range:
+
+    * if the link already fails at ``lo`` it never closes anywhere in the
+      window, so the coverage radius is ``0.0`` — reporting ``lo`` would claim
+      coverage the link does not have;
+    * if it still closes at ``hi`` the true root lies beyond the bracket, so
+      ``hi`` is returned as a lower bound on the coverage radius.
     """
     f_lo = received_snr(link, lo) - link.detection_threshold_db
     f_hi = received_snr(link, hi) - link.detection_threshold_db
-    # If it doesn't even close at lo, the link never closes in this window.
     if f_lo < 0:
-        return lo
+        return 0.0
     if f_hi > 0:
         return hi
     for _ in range(120):
@@ -167,4 +188,5 @@ def compute_link_budget(link: AcousticLink, range_m: float) -> LinkBudget:
         received_snr_db=snr,
         closes=closes,
         max_range_m=max_link_range(link),
+        detection_threshold_db=link.detection_threshold_db,
     )

@@ -1,9 +1,12 @@
 """Subprocess smoke tests for the thin mission-phase CLIs."""
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 
@@ -73,7 +76,42 @@ def test_preflight_all_pass():
     assert "PASS" in proc.stdout
 
 
-def test_unknown_phase_exits_2():
-    # run _common through a phase that doesn't exist -> treat bad goal as unknown
-    proc = _run_script("recon.py", "l", "extra")
-    assert proc.returncode == 0  # extra args are ignored; still recon
+def test_extra_cli_args_are_ignored():
+    """Only the first positional arg is the goal; trailing args do not break the CLI."""
+    proc = _run_script("recon.py", "primary goal", "ignored extra")
+    assert proc.returncode == 0, proc.stderr
+    assert json.loads(proc.stdout)["goal"] == "primary goal"
+
+
+def test_unknown_phase_raises():
+    """run_phase rejects a phase outside the frozen five-stage protocol."""
+    import sys as _sys
+
+    _sys.path.insert(0, str(PACKAGE_ROOT / "scripts"))
+    import _common
+
+    with pytest.raises(ValueError, match="unknown phase"):
+        _common.run_phase("infiltrate")
+
+
+def test_unknown_phase_cli_exits_2(tmp_path):
+    """A phase CLI whose filename is not a protocol stage exits 2, not 0.
+
+    The script name *is* the phase, so a copy under an unknown name is the
+    realistic way this failure reaches the CLI layer.
+    """
+    bogus = tmp_path / "infiltrate.py"
+    bogus.write_text(
+        (PACKAGE_ROOT / "scripts" / "recon.py").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    proc = subprocess.run(
+        [sys.executable, str(bogus)],
+        cwd=PACKAGE_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "PYTHONPATH": str(PACKAGE_ROOT / "scripts")},
+    )
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert "unknown phase" in proc.stderr

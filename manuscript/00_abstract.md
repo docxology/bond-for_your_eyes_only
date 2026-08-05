@@ -25,9 +25,16 @@ implemented as a pure, infrastructure-free domain module:
    ({{RESULT_FIRE_INTERCEPT_S}} s, {{RESULT_FIRE_LEAD_DEG}}° lead;
    feasible {{RESULT_FIRE_FEASIBLE}}).
 6. **Underwater acoustic link** — a link budget with SNR
-   {{RESULT_LINK_SNR_DB}} dB at {{RESULT_LINK_RANGE_M}} m (closes:
-   {{RESULT_LINK_CLOSES}}; max range {{RESULT_LINK_MAX_RANGE_M}} m).
+   {{RESULT_LINK_SNR_DB}} dB at {{RESULT_LINK_RANGE_M}} m against a
+   {{RESULT_LINK_THRESHOLD_DB}} dB threshold, a margin of
+   {{RESULT_LINK_MARGIN_DB}} dB (closes: {{RESULT_LINK_CLOSES}}; max range
+   {{RESULT_LINK_MAX_RANGE_M}} m).
 
-Every computation is deterministic — fixed seeds, no untracked randomness, no
-wall-clock dependence in persisted artifacts — and each concept carries a
-matching real-data test suite. Keywords: {{CONFIG_KEYWORDS}}.
+Every computation is deterministic — a single fixed seed
+({{RESULT_MISSION_SEED}}), no untracked randomness, no wall-clock dependence in
+persisted artifacts — and each concept carries a matching real-data test suite
+with no mocking framework. Every quantity above is injected from the code that
+computed it rather than typed into the prose, and the escrow's fingerprint
+match is re-derived by comparison rather than asserted, so a wrong result would
+surface as a changed number instead of a stale claim. Keywords:
+{{CONFIG_KEYWORDS}}.

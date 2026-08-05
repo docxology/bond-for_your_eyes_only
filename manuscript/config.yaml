@@ -35,18 +35,32 @@ metadata:
   license: "MIT"
   language: "en"
 
-# Mission parameters — read by manuscript_variables._compute_mission_metrics().
+# Mission parameters — the declared, human-readable statement of the canonical
+# ATAC scenario.
+#
+# These values are NOT injected into the manuscript: every result token is
+# computed live by src/for_your_eyes_only/mission.canonical_mission() from the
+# module constants, so no configuration edit can silently change a reported
+# number. This block is instead *bound* to those constants by
+# tests/test_config_consistency.py, which fails if the two ever disagree — the
+# block is a checked mirror, not decoration and not a second source of truth.
+#
+# The escrow key is deliberately absent: it is derived from the seed at import
+# time (mission._atan_key), so writing a literal here would be a claim the code
+# does not honour.
 mission:
   codename: "ATAC"
   slug: "for_your_eyes_only"
   film: "For Your Eyes Only"
   year: 1981
   escrow:
-    key: 4242
     threshold: 2
     num_shares: 3
     custodians: ["q_branch", "m", "field_agent"]
     seed: 7
+  recovery:
+    data_symbols: 4
+    code_symbols: 6
   underwater:
     wreck_depth: 42.0
     bottom_time_s: 600.0
@@ -55,6 +69,10 @@ mission:
     origin: "corfu"
     destination: "wreck_site"
     risk_weight: 1.0
+  acoustic:
+    frequency_khz: 15.0
+    range_m: 3500.0
+    detection_threshold_db: 8.0
 
 # Environment / reproducibility
 render:

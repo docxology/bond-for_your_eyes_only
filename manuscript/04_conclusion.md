@@ -21,3 +21,18 @@ The architecture — a pure infrastructure-free domain core (six modules), a
 thin frozen-protocol adapter, and thin per-phase CLIs — matches the PROJECT
 BOND convention and keeps the package both self-contained and ready to bind
 to shared suite dependencies as they land.
+
+## On verdicts that can fail
+
+A recurring hazard in software that reports on itself is the check that cannot
+fail: a verdict stapled to a literal, a decoder whose general case is never
+exercised, a margin that restates the quantity it claims to qualify, a
+configuration block nothing reads. Each of those was present in an earlier
+revision of this package and each has been replaced by a derived value bound to
+a test. The escrow's fingerprint match is now recomputed and compared; the
+erasure decoder accepts arbitrary surviving-fragment sets and is tested across
+all of them; the link margin is measured against the detection threshold; and
+the declared mission configuration is pinned to the constants the mission
+executes with. None of this changes what the software computes — it changes
+whether a wrong answer would be visible, which is the property the rest of the
+report depends on.

@@ -166,28 +166,44 @@ def recover_erasure(
     code: ErasureCode,
     *,
     checksum: bool = True,
+    indices: tuple[int, ...] | None = None,
 ) -> tuple[int, ...]:
     """Recover the original data from the encoded symbols.
 
-    Uses the first ``data_symbols`` code symbols as the fragment set and
-    solves the Vandermonde system. When ``checksum`` is True the trailing
-    integrity symbol (present when ``len(symbols) == code_symbols + 1``) is
-    verified against the reconstructed data.
+    Solves the Vandermonde system built from a chosen set of surviving
+    fragments. This is where the erasure property is actually exercised:
+    ``indices`` selects *which* ``data_symbols`` fragments survived, so any
+    ``k`` of the ``n`` fragments reconstruct the key — not merely the leading
+    ``k``. When ``indices`` is omitted the leading ``k`` fragments are used.
 
     Args:
         symbols: The code symbols as returned by :func:`encode_erasure`.
         code: The erasure code configuration.
+        checksum: Verify the trailing integrity symbol against the
+            reconstruction. Requesting verification when no checksum symbol is
+            present is an error rather than a silent skip — otherwise a caller
+            asking to be protected would be told nothing was wrong.
+        indices: Positions of the surviving fragments (exactly
+            ``code.data_symbols`` distinct positions into the code symbols).
 
     Returns:
         The recovered data symbols.
 
     Raises:
         ChecksumMismatchError: if the integrity checksum does not match.
+        ValueError: on too few fragments, a bad index set, or a requested
+            checksum that is absent.
     """
     prime = code.prime
-    if checksum and len(symbols) == code.code_symbols + 1:
+    has_checksum = len(symbols) == code.code_symbols + 1
+    if checksum and not has_checksum:
+        raise ValueError(
+            f"checksum verification requested but no checksum symbol present "
+            f"(expected {code.code_symbols + 1} symbols, got {len(symbols)})"
+        )
+    if has_checksum:
         code_symbols = symbols[: code.code_symbols]
-        expected = symbols[-1]
+        expected: int | None = symbols[-1] if checksum else None
     else:
         code_symbols = symbols
         expected = None
@@ -197,9 +213,20 @@ def recover_erasure(
 
     points = code.points()
     k = code.data_symbols
+    if indices is None:
+        chosen = tuple(range(k))
+    else:
+        chosen = tuple(indices)
+        if len(chosen) != k:
+            raise ValueError(f"need exactly {k} surviving fragment indices, got {len(chosen)}")
+        if len(set(chosen)) != k:
+            raise ValueError("surviving fragment indices must be distinct")
+        if any(not (0 <= i < len(code_symbols)) for i in chosen):
+            raise ValueError(f"fragment index out of range for {len(code_symbols)} code symbols")
+
     rows: list[tuple[int, ...]] = []
     rhs: list[int] = []
-    for i in range(k):
+    for i in chosen:
         x = points[i]
         rows.append(tuple(_power(x, j, prime) for j in range(k)))
         rhs.append(code_symbols[i] % prime)

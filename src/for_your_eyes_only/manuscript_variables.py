@@ -21,9 +21,14 @@ from typing import Any, Callable
 
 import yaml
 
-from for_your_eyes_only.mission import ATAC_MISSION, SLUG, canonical_mission
+from for_your_eyes_only.mission import ATAC_MISSION, MISSION_SEED, SLUG, canonical_mission
 
-__all__ = ["generate_variables", "load_manuscript_config", "resolve_manuscript_tree"]
+__all__ = [
+    "METRIC_TOKENS",
+    "generate_variables",
+    "load_manuscript_config",
+    "resolve_manuscript_tree",
+]
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = PACKAGE_ROOT / "manuscript" / "config.yaml"
@@ -44,7 +49,10 @@ def _compute_mission_metrics() -> dict[str, str]:
         "RESULT_ESCROW_THRESHOLD": str(sc.escrow_threshold),
         "RESULT_ESCROW_SHARES": str(sc.escrow_num_shares),
         "RESULT_ESCROW_KEY": str(sc.released_key),
-        "RESULT_RECOVERED_MATCH": str(True),
+        # Derived by comparing the released key's fingerprint against the
+        # escrow's, never stapled: a literal here would render "True" in the
+        # manuscript even if release started handing back the wrong key.
+        "RESULT_RECOVERED_MATCH": str(sc.fingerprint_match),
         # Erasure-coded key recovery.
         "RESULT_RECOVERY_DATA_SYMBOLS": str(sc.recovery_code.data_symbols),
         "RESULT_RECOVERY_CODE_SYMBOLS": str(sc.recovery_code.code_symbols),
@@ -72,7 +80,17 @@ def _compute_mission_metrics() -> dict[str, str]:
         "RESULT_LINK_CLOSES": str(link_budget.closes),
         "RESULT_LINK_MAX_RANGE_M": f"{link_budget.max_range_m:.0f}",
         "RESULT_LINK_RANGE_M": f"{link_budget.range_m:.0f}",
+        "RESULT_LINK_THRESHOLD_DB": f"{link_budget.detection_threshold_db:g}",
+        "RESULT_LINK_MARGIN_DB": f"{link_budget.margin_db:.2f}",
+        # Determinism parameters (so prose never types the seed by hand).
+        "RESULT_MISSION_SEED": str(MISSION_SEED),
     }
+
+
+#: Every token :func:`_compute_mission_metrics` produces. Derived from a single
+#: canonical run rather than hand-listed, so the draft-mode "N/A" fallback can
+#: never drift out of step with the live metric set.
+METRIC_TOKENS: tuple[str, ...] = tuple(sorted(_compute_mission_metrics()))
 
 
 # --------------------------------------------------------------------------- #
@@ -97,6 +115,7 @@ def generate_variables(
     config_path: str | Path | None = None,
     require_outputs: bool = True,
     now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+    metrics_provider: Callable[[], dict[str, str]] = _compute_mission_metrics,
 ) -> dict[str, str]:
     """Compute the ``{{TOKEN}}`` → value mapping for the manuscript.
 
@@ -105,6 +124,10 @@ def generate_variables(
         require_outputs: When True (default), fail if the domain modules cannot
             produce live results (metrics fall back to "N/A" only in draft).
         now: A thunk returning the current UTC time (override for tests).
+        metrics_provider: The callable that computes the live result metrics.
+            A real seam, not a stand-in: tests pass an ordinary function that
+            raises so the strict-vs-draft branch is exercised by real control
+            flow rather than left as an untested claim.
 
     Returns:
         Fully populated token map, including domain-computed result tokens.
@@ -116,41 +139,11 @@ def generate_variables(
 
     metrics: dict[str, str]
     try:
-        metrics = _compute_mission_metrics()
+        metrics = metrics_provider()
     except Exception as exc:  # noqa: BLE001 — strict gate converts any failure to N/A in draft
         if require_outputs:
             raise ValueError(f"mission domain modules failed to produce live outputs: {exc}") from exc
-        metrics = {
-            key: "N/A"
-            for key in (
-                "RESULT_ESCROW_THRESHOLD",
-                "RESULT_ESCROW_SHARES",
-                "RESULT_ESCROW_KEY",
-                "RESULT_RECOVERED_MATCH",
-                "RESULT_RECOVERY_DATA_SYMBOLS",
-                "RESULT_RECOVERY_CODE_SYMBOLS",
-                "RESULT_RECOVERY_MATCH",
-                "RESULT_WRECK_DEPTH",
-                "RESULT_DIVE_TOTAL_S",
-                "RESULT_SURFACE_OFFSET_E",
-                "RESULT_SURFACE_OFFSET_N",
-                "RESULT_TARGET_REACHABLE",
-                "RESULT_ROUTE",
-                "RESULT_ROUTE_COST",
-                "RESULT_ROUTE_DISTANCE",
-                "RESULT_ROUTE_HOPS",
-                "RESULT_FIRE_FEASIBLE",
-                "RESULT_FIRE_INTERCEPT_S",
-                "RESULT_FIRE_LEAD_DEG",
-                "RESULT_FIRE_COURSE_DEG",
-                "RESULT_FIRE_CLOSEST_M",
-                "RESULT_LINK_SNR_DB",
-                "RESULT_LINK_TL_DB",
-                "RESULT_LINK_CLOSES",
-                "RESULT_LINK_MAX_RANGE_M",
-                "RESULT_LINK_RANGE_M",
-            )
-        }
+        metrics = dict.fromkeys(METRIC_TOKENS, "N/A")
 
     config_keywords = [str(k) for k in config.get("keywords", [])]
     variables: dict[str, str] = {

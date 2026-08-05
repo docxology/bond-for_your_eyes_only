@@ -90,6 +90,11 @@ class HaldaneModel:
     Each compartment ``i`` has a half-time ``t1_2`` (seconds) and an M-value
     coefficient ``m`` (the tissue's tolerated over-pressure per metre of
     ambient pressure above surface). The set is fixed at construction.
+
+    An M-value must exceed 1.0: it is the *multiple* of surface pressure a
+    tissue tolerates, so a value at or below 1.0 would describe a tissue that
+    cannot survive being at the surface, and would make
+    :func:`no_decompression_limit` return a negative exposure.
     """
 
     half_times: tuple[float, ...] = (34.0, 52.0, 80.0, 240.0, 360.0, 540.0)
@@ -100,6 +105,8 @@ class HaldaneModel:
             raise ValueError("HaldaneModel half_times and m_values must have equal length")
         if not all(t > 0 for t in self.half_times):
             raise ValueError("HaldaneModel half_times must be positive")
+        if not all(m > 1.0 for m in self.m_values):
+            raise ValueError("HaldaneModel m_values must each exceed 1.0 (surface-pressure multiple)")
 
     def tau(self, index: int) -> float:
         """Return the time constant ``tau = t1/2 / ln(2)`` for compartment i."""
@@ -143,9 +150,9 @@ def no_decompression_limit(model: HaldaneModel, depth_m: float) -> float:
     .. math:: t_i = -\\tau_i \\ln\\frac{P_{amb}-M_i}{P_{amb}-1}
 
     A compartment that never reaches ``M_i`` at this depth (``P_amb <= M_i``)
-    imposes no limit. Returns ``inf`` at or above the surface (no bottom time
-    limit at zero depth), and the smallest positive limiting exposure — or
-    ``0.0`` if a shallow depth is safe (no compartment constrains it).
+    imposes no limit. Returns ``inf`` at or above the surface, and otherwise
+    the smallest limiting exposure — which is itself ``inf`` when the depth is
+    shallow enough that no compartment can ever reach its ceiling.
     """
     ambient = 1.0 + depth_m / 10.0  # absolute pressure in atmospheres
     if ambient <= 1.0:
@@ -155,18 +162,14 @@ def no_decompression_limit(model: HaldaneModel, depth_m: float) -> float:
         m_value = model.m_values[index]
         if ambient <= m_value:
             continue  # this tissue never reaches its surface supersaturation
+        # Past the guard above, num = ambient - m_value > 0, and den =
+        # ambient - 1 > 0 because ambient > 1; the logarithm is therefore
+        # always well defined here and needs no further guard.
         num = ambient - m_value
         den = ambient - 1.0
-        if num <= 0.0 or den <= 0.0:
-            continue
         exposure = model.tau(index) * math.log(den / num)
-        if exposure > 0:
-            limiting = min(limiting, exposure)
-    if math.isfinite(limiting):
-        return limiting
-    # No compartment constrained us: either infinite (no decompression needed)
-    # or computationally negligible (return the surface-safety sentinel 0.0).
-    return 0.0 if ambient > 1.0 else math.inf
+        limiting = min(limiting, exposure)
+    return limiting
 
 
 # --------------------------------------------------------------------------- #
@@ -182,9 +185,18 @@ def plan_descent(
 ) -> DiveProfile:
     """Plan a deterministic dive: descent, bottom, then a staged ascent.
 
-    The ascent is decomposed into ``STOP_INTERVAL``-snapped stages. Each stage
-    holds the tissue model's tolerance so the schedule never exceeds the
-    decompression ceiling; the total profile is fully deterministic.
+    The ascent is decomposed into fixed ``STOP_INTERVAL``-snapped stages, each
+    traversed at ``ASCENT_RATE``. The profile is fully deterministic.
+
+    .. warning::
+
+        This schedule is **geometric, not physiological**. It does not consult
+        :class:`HaldaneModel`, :func:`no_decompression_limit`, or any tissue
+        ceiling — stop depths and durations are fixed by ``STOP_INTERVAL`` and
+        ``ASCENT_RATE`` alone. The tissue model in this module is exercised
+        separately (see :func:`no_decompression_limit`) and is not yet wired
+        into ascent staging. Do not read a stage boundary here as a
+        decompression obligation.
 
     Args:
         depth_m: Wreck depth (metres, > 0).
@@ -206,9 +218,8 @@ def plan_descent(
     ascent_stages: list[DepthStage] = []
     ascent_time = 0.0
     depth = depth_m
-    # Climb in STOP_INTERVAL steps to the surface, sizing each step from the
-    # tissue model so no compartment exceeds its ceiling after the slowest
-    # ascent the schedule permits (approximated deterministically).
+    # Climb to the surface in fixed STOP_INTERVAL steps. Deliberately geometric:
+    # no tissue-model consultation happens here (see the docstring warning).
     while depth > 0.0:
         step = min(depth, STOP_INTERVAL)
         segment_time = step / ASCENT_RATE
@@ -259,11 +270,16 @@ class DiveSchedule:
 
 
 def format_schedule(profile: DiveProfile) -> DiveSchedule:
-    """Flatten a :class:`DiveProfile` into an ordered (phase, depth, time) schedule."""
+    """Flatten a :class:`DiveProfile` into an ordered (phase, depth, time) schedule.
+
+    The bottom row always carries the profile's maximum depth. A zero bottom
+    time means the diver spent no time there, not that the bottom was at the
+    surface, so the depth column stays truthful either way.
+    """
     rows: list[tuple[str, float, float]] = []
     for stage in profile.descent_stages:
         rows.append(("descent", stage.depth, stage.duration_s))
-    rows.append(("bottom", profile.bottom_time_s and profile.max_depth(), profile.bottom_time_s))
+    rows.append(("bottom", profile.max_depth(), profile.bottom_time_s))
     for stage in profile.ascent_stages:
         rows.append(("ascent", stage.depth, stage.duration_s))
     return DiveSchedule(tuple(rows))

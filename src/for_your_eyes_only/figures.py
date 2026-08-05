@@ -4,12 +4,16 @@ Renders publication-quality figures for the mission's concepts, all fully
 deterministic (matplotlib ``Agg`` backend, fixed data from the domain modules,
 no RNG). Each generator returns the absolute path of the written PNG.
 
-Figures:
+Figures (all four written by :func:`render_all`):
 
 * :func:`render_island_graph` — the Ionian insertion graph with the planned
   route highlighted.
 * :func:`render_dive_profile` — the underwater retrieval dive depth/time
   profile with current-drift offset annotation.
+* :func:`render_targeting_geometry` — the fire-control intercept geometry:
+  line of sight, weapon course, and target velocity.
+* :func:`render_acoustic_link` — the acoustic link SNR-vs-range curve with the
+  detection threshold, operating point, and maximum closure range.
 """
 
 from __future__ import annotations
@@ -25,7 +29,7 @@ import matplotlib.axes
 import matplotlib.pyplot as plt  # noqa: E402
 
 from for_your_eyes_only import acoustic_link, island_routing, targeting, underwater_retrieval
-from for_your_eyes_only.mission import _LINK, _LINK_RANGE_M  # noqa: PLC2701 - canonical scenario
+from for_your_eyes_only.mission import ATAC_LINK, ATAC_LINK_RANGE_M
 
 #: Canonical figures output directory (under the package ``output/`` tree).
 DEFAULT_FIGURE_DIR = Path(__file__).resolve().parents[2] / "output" / "figures"
@@ -186,15 +190,18 @@ def render_acoustic_link(
     *,
     output_path: str | Path | None = None,
     link: acoustic_link.AcousticLink | None = None,
-    range_m: float = _LINK_RANGE_M,
+    range_m: float = ATAC_LINK_RANGE_M,
 ) -> Path:
     """Render the underwater acoustic link SNR-vs-range curve and closure point."""
     dest = Path(output_path) if output_path is not None else DEFAULT_FIGURE_DIR / "acoustic_link.png"
     dest.parent.mkdir(parents=True, exist_ok=True)
 
-    link = link if link is not None else _LINK
+    link = link if link is not None else ATAC_LINK
     max_range = acoustic_link.max_link_range(link)
-    ranges = [float(r) for r in range(100, int(max_range * 1.5), 100)]
+    # A link that never closes reports max_range 0.0; still sweep out past the
+    # operating range so the figure shows *why* it fails rather than going blank.
+    sweep_to = max(max_range * 1.5, range_m * 1.5, 1000.0)
+    ranges = [float(r) for r in range(100, int(sweep_to), 100)]
     snr_curve = [acoustic_link.received_snr(link, r) for r in ranges]
 
     fig, ax = plt.subplots(figsize=(8, 5))

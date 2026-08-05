@@ -11,13 +11,15 @@ The five stages map ATAC's mission shape onto the protocol:
 
 * **brief** — declare the ATAC recovery mission and its escrow asset.
 * **recon** — survey the request (goal), the asset, and the constraints.
-* **plan** — sequence the three concept operations: escrow release, underwater
-  retrieval, island insertion routing.
+* **plan** — sequence the six concept operations: escrow release, erasure-coded
+  key recovery, underwater retrieval, island insertion routing, fire-control
+  targeting, and the acoustic uplink budget.
 * **execute** — deterministically run each planned step and return provenance.
 * **debrief** — summarise the outcome and record standing lessons.
 
-Pure domain modules (``key_escrow``, ``underwater_retrieval``,
-``island_routing``) stay importable without bond-api; only this module depends
+All six pure domain modules (``key_escrow``, ``key_recovery``,
+``underwater_retrieval``, ``island_routing``, ``targeting``,
+``acoustic_link``) stay importable without bond-api; only this module depends
 on the protocol. Defaults are deterministic (fixed seed, no wall clock).
 """
 
@@ -50,7 +52,27 @@ from for_your_eyes_only import (
     underwater_retrieval,
 )
 
-__all__ = ["ATAC_MISSION", "GADGETS", "MissionProvider", "build_gadgets"]
+__all__ = [
+    "ATAC_LINK",
+    "ATAC_LINK_RANGE_M",
+    "ATAC_MISSION",
+    "CUSTODIANS",
+    "ESCROW_SHARES",
+    "ESCROW_THRESHOLD",
+    "GADGETS",
+    "MISSION_SEED",
+    "RECOVERY_CODE_SYMBOLS",
+    "RECOVERY_DATA_SYMBOLS",
+    "ROUTE_DESTINATION",
+    "ROUTE_ORIGIN",
+    "ROUTE_RISK_WEIGHT",
+    "SLUG",
+    "CanonicalMission",
+    "MissionProvider",
+    "build_gadgets",
+    "canonical_mission",
+    "key_fingerprint",
+]
 
 #: Mission identity for this film.
 ATAC_MISSION = "ATAC"
@@ -59,19 +81,23 @@ SLUG = "for_your_eyes_only"
 
 _PACKAGE_VERSION = "0.1.0"
 #: Deterministic seed for the whole mission (fixed, no untracked randomness).
-_SEED = 7
+MISSION_SEED = 7
 #: Escrow quorum: 2 of 3 custodians may release the ATAC key.
-_ESCROW_THRESHOLD = 2
-_ESCROW_SHARES = 3
-_CUSTODIANS = ("q_branch", "m", "field_agent")
+ESCROW_THRESHOLD = 2
+ESCROW_SHARES = 3
+CUSTODIANS = ("q_branch", "m", "field_agent")
 #: Erasure-code geometry used for the recovered-key fragments.
-_RECOVERY_DATA_SYMBOLS = 4
-_RECOVERY_CODE_SYMBOLS = 6
+RECOVERY_DATA_SYMBOLS = 4
+RECOVERY_CODE_SYMBOLS = 6
+#: Canonical Ionian insertion leg and how strongly risk penalises an edge.
+ROUTE_ORIGIN = "corfu"
+ROUTE_DESTINATION = "wreck_site"
+ROUTE_RISK_WEIGHT = 1.0
 #: Acoustic link configuration for the ATAC underwater uplink. The wreck
 #: uplink is a shallow-water horizontal channel (range >> depth), so it uses
 #: cylindrical spreading (spreading=1.0). Tuned so the 3.5 km operating range
 #: closes with margin and max_range is interior to the plan.
-_LINK = acoustic_link.AcousticLink(
+ATAC_LINK = acoustic_link.AcousticLink(
     frequency_khz=15.0,
     source_level_db=145.0,
     noise_level_db=55.0,
@@ -80,22 +106,31 @@ _LINK = acoustic_link.AcousticLink(
     spreading=1.0,
 )
 #: Operating range (m) at which the link budget is evaluated (wreck uplink).
-_LINK_RANGE_M = 3500.0
+ATAC_LINK_RANGE_M = 3500.0
 
 
 #: The ATAC key to escrow (derived deterministically from the seed).
 def _atan_key(rng: random.Random) -> int:
     # A "lost key" recovered from a wreck: derive a stable value from the seed.
-    return rng.randrange(1, 2**32)
+    return rng.randrange(1, key_escrow.KEY_BOUND)
+
+
+def key_fingerprint(key: int) -> str:
+    """Return the SHA-256 fingerprint an escrow binds a key to.
+
+    Exposed so the mission can *re-derive* the fingerprint of a released key
+    and compare it against the escrow, rather than asserting a match.
+    """
+    return hashlib.sha256(str(key).encode("utf-8")).hexdigest()
 
 
 #: The escrow state this mission operates on (typed; built once, immutable).
 _ATAN_ESCROW: key_escrow.EscrowState = key_escrow.create_escrow(
-    _atan_key(random.Random(_SEED)),
-    threshold=_ESCROW_THRESHOLD,
-    num_shares=_ESCROW_SHARES,
-    custodian_labels=_CUSTODIANS,
-    seed=_SEED,
+    _atan_key(random.Random(MISSION_SEED)),
+    threshold=ESCROW_THRESHOLD,
+    num_shares=ESCROW_SHARES,
+    custodian_labels=CUSTODIANS,
+    seed=MISSION_SEED,
 )
 
 
@@ -116,8 +151,8 @@ def build_gadgets() -> dict[str, object]:
         "targeting": targeting.intercept_solution,
         "encode_erasure": key_recovery.encode_erasure,
         "recover_erasure": key_recovery.recover_erasure,
-        "erasure_code": key_recovery.ErasureCode(_RECOVERY_DATA_SYMBOLS, _RECOVERY_CODE_SYMBOLS),
-        "acoustic_link": _LINK,
+        "erasure_code": key_recovery.ErasureCode(RECOVERY_DATA_SYMBOLS, RECOVERY_CODE_SYMBOLS),
+        "acoustic_link": ATAC_LINK,
         "compute_link_budget": acoustic_link.compute_link_budget,
     }
 
@@ -147,6 +182,10 @@ class CanonicalMission:
     """
 
     released_key: int
+    #: Whether the released key re-derives the escrow's stored fingerprint.
+    #: Computed by comparison, never asserted, so the manuscript token and the
+    #: mission result both fail loudly if release ever returns a wrong key.
+    fingerprint_match: bool
     escrow_threshold: int
     escrow_num_shares: int
     recovery_code: key_recovery.ErasureCode
@@ -163,14 +202,14 @@ class CanonicalMission:
 def canonical_mission() -> CanonicalMission:
     """Compute the deterministic ATAC mission outputs as typed domain objects."""
     escrow_key = key_escrow.release_key(_ATAN_ESCROW, tuple(range(_ATAN_ESCROW.threshold)))
-    recovery_code = key_recovery.ErasureCode(_RECOVERY_DATA_SYMBOLS, _RECOVERY_CODE_SYMBOLS)
-    data = tuple((escrow_key + i) % key_recovery.ERASURE_PRIME for i in range(_RECOVERY_DATA_SYMBOLS))
+    recovery_code = key_recovery.ErasureCode(RECOVERY_DATA_SYMBOLS, RECOVERY_CODE_SYMBOLS)
+    data = tuple((escrow_key + i) % key_recovery.ERASURE_PRIME for i in range(RECOVERY_DATA_SYMBOLS))
     encoded = key_recovery.encode_erasure(data, recovery_code)
     recovered = key_recovery.recover_erasure(encoded, recovery_code)
     planner = underwater_retrieval.RetrievalPlanner()
     retrieval = planner.plan()
     graph = island_routing.build_ionian_graph()
-    route = island_routing.plan_route(graph, "corfu", "wreck_site", risk_weight=1.0)
+    route = island_routing.plan_route(graph, ROUTE_ORIGIN, ROUTE_DESTINATION, risk_weight=ROUTE_RISK_WEIGHT)
     fire = targeting.intercept_solution(
         target_range_m=4000.0,
         target_bearing_deg=45.0,
@@ -178,9 +217,10 @@ def canonical_mission() -> CanonicalMission:
         target_speed_ms=8.0,
         weapon_speed_ms=45.0,
     )
-    link_budget = acoustic_link.compute_link_budget(_LINK, _LINK_RANGE_M)
+    link_budget = acoustic_link.compute_link_budget(ATAC_LINK, ATAC_LINK_RANGE_M)
     return CanonicalMission(
         released_key=escrow_key,
+        fingerprint_match=key_fingerprint(escrow_key) == _ATAN_ESCROW.key_fingerprint,
         escrow_threshold=_ATAN_ESCROW.threshold,
         escrow_num_shares=_ATAN_ESCROW.num_shares,
         recovery_code=recovery_code,
@@ -255,7 +295,7 @@ class MissionProvider:  # noqa: N801 — class name fixed by the discovery contr
                 Step(
                     name="escrow_release",
                     action="release_key",
-                    params={"quorum": _ESCROW_THRESHOLD, "asset": brief.assets[0].name},
+                    params={"quorum": ESCROW_THRESHOLD, "asset": brief.assets[0].name},
                 ),
                 Step(name="key_recovery", action="recover_erasure", params={"code": "6-of-4"}),
                 Step(
@@ -266,13 +306,13 @@ class MissionProvider:  # noqa: N801 — class name fixed by the discovery contr
                 Step(
                     name="island_routing",
                     action="plan_route",
-                    params={"origin": "corfu", "destination": "wreck_site"},
+                    params={"origin": ROUTE_ORIGIN, "destination": ROUTE_DESTINATION},
                 ),
                 Step(name="targeting", action="intercept_solution", params={"weapon_speed_ms": 45.0}),
                 Step(
                     name="acoustic_link",
                     action="compute_link_budget",
-                    params={"range_m": _LINK_RANGE_M, "frequency_khz": _LINK.frequency_khz},
+                    params={"range_m": ATAC_LINK_RANGE_M, "frequency_khz": ATAC_LINK.frequency_khz},
                 ),
             )
         )
@@ -282,12 +322,14 @@ class MissionProvider:  # noqa: N801 — class name fixed by the discovery contr
         results: dict[str, object] = {}
         sc = canonical_mission()
 
-        # Step 1 — escrow release: a verified quorum reconstructs the key.
+        # Step 1 — escrow release: a verified quorum reconstructs the key. The
+        # match is re-derived from the released key, not asserted: a stapled
+        # `True` here would make the preflight's escrow verdict unfalsifiable.
         escrow = _ATAN_ESCROW
         results["escrow_release"] = {
             "quorum": escrow.threshold,
             "key": sc.released_key,
-            "fingerprint_match": True,
+            "fingerprint_match": sc.fingerprint_match,
         }
 
         # Step 2 — key recovery: erasure-code reconstructs the key fragments.
@@ -329,7 +371,7 @@ class MissionProvider:  # noqa: N801 — class name fixed by the discovery contr
         # Step 6 — acoustic link: link budget over the wreck uplink.
         link_budget = sc.link_budget
         results["acoustic_link"] = {
-            "range_m": _LINK_RANGE_M,
+            "range_m": ATAC_LINK_RANGE_M,
             "received_snr_db": link_budget.received_snr_db,
             "transmission_loss_db": link_budget.transmission_loss_db,
             "closes": link_budget.closes,
@@ -337,7 +379,7 @@ class MissionProvider:  # noqa: N801 — class name fixed by the discovery contr
         }
 
         input_hash = _input_hash(
-            _SEED,
+            MISSION_SEED,
             escrow.key_fingerprint,
             sc.released_key,
             fire.intercept_time_s,
@@ -349,7 +391,7 @@ class MissionProvider:  # noqa: N801 — class name fixed by the discovery contr
             results=results,
             provenance=Provenance(
                 package_version=_PACKAGE_VERSION,
-                seed=_SEED,
+                seed=MISSION_SEED,
                 input_hash=input_hash,
                 wall_time_s=0.0,
             ),

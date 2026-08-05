@@ -34,16 +34,19 @@ from dataclasses import dataclass, field
 from typing import Sequence
 
 __all__ = [
-    "CustodyTransfer",
-    "EscrowState",
-    "EscrowError",
+    "KEY_BOUND",
     "PRIME",
     "PRIMITIVE_ROOT",
+    "CustodyTransfer",
+    "EscrowError",
+    "EscrowState",
     "commit_share",
+    "create_escrow",
     "custody_chain_hash",
     "generate_custody_transfer",
     "mod_inverse",
     "recover_key",
+    "release_key",
     "split_key",
     "verify_share",
 ]
@@ -54,8 +57,9 @@ PRIME = 2**61 - 1
 #: A primitive root modulo ``PRIME`` (used for share commitments).
 PRIMITIVE_ROOT = 2
 
-#: Default key range bound when synthesising a key from a seed.
-_KEY_BOUND = 2**32
+#: Exclusive upper bound for a synthesised ATAC key. Callers deriving a key
+#: from a seed draw from ``[1, KEY_BOUND)`` so keys stay well inside the field.
+KEY_BOUND = 2**32
 
 
 class EscrowError(ValueError):
@@ -166,10 +170,6 @@ def _lagrange_interpolate(points: Sequence[tuple[int, int]], x: int, p: int) -> 
 # --------------------------------------------------------------------------- #
 # Key / share generation
 # --------------------------------------------------------------------------- #
-
-
-def _derive_key(rng: random.Random) -> int:
-    return rng.randrange(1, _KEY_BOUND)
 
 
 def split_key(

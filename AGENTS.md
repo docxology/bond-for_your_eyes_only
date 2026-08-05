@@ -1,70 +1,120 @@
 # for_your_eyes_only — ATAC Mission Software
 
-This is a PROJECT BOND film package. Scope is **exactly this directory**.
-It is a **local-only** working tree: no remote, never push.
-All builds/tests run from this directory.
+PROJECT BOND film package for **For Your Eyes Only (1981)**, mission codename
+**ATAC**. Scope is **exactly this directory**. This is a **local-only** working
+tree: no remote, never push. All commands run from this directory.
+
+Detailed guidance lives in `docs/`:
+
+| Document | Covers |
+|---|---|
+| [`docs/architecture.md`](docs/architecture.md) | Module-by-module internals, layer topology, protocol adapter |
+| [`docs/AGENTS.md`](docs/AGENTS.md) | Full working rules, invariants, and package-specific traps |
+| [`docs/agent_instructions.md`](docs/agent_instructions.md) | Commands and task recipes |
+| [`docs/testing_philosophy.md`](docs/testing_philosophy.md) | No-mock / real-data / determinism doctrine |
 
 ## Mission
 
-Film: **For Your Eyes Only (1981)** · mission codename **ATAC**.
+The ATAC is a lost-key targeting device whose recovery and employment span
+custody, underwater access, routing, fire control, and acoustic
+communications. The software escrows its key across custodians so no single
+holder may release it and erasure-codes it against loss; plans the wreck dive
+against depth and current; routes the insertion across the Ionian islands;
+computes a firing solution against a moving contact; and budgets the acoustic
+uplink that carries the solution back.
 
-The ATAC (Automatic Targeting Attack Communicator) is a lost-key targeting
-device whose recovery and employment span custody, underwater access, routing,
-fire control, and acoustic communications. The mission software must: escrow
-its key across custodians (no single holder may release it) and erasure-code
-it against loss; recover the device from a wreck underwater (compensating for
-depth and currents); route the insertion across the Greek islands; then direct
-it onto a moving contact and uplink targeting data acoustically.
+## Build and test
 
-## Architecture & layer contract
+```bash
+uv sync                                              # install (bond-api is a local path dep)
+
+uv run pytest tests/ --cov=src --cov-fail-under=90   # tests + branch coverage, floor 90% of src/
+uv run ruff check src/ scripts/ tests/               # lint
+uv run ruff format --check src/ scripts/ tests/      # formatting
+uv run mypy src/ scripts/                            # types
+```
+
+Run the mission end to end:
+
+```bash
+uv run python scripts/00_preflight.py                # PASS/FAIL verdicts, non-zero exit on failure
+uv run python scripts/brief.py                       # also: recon plan execute debrief
+uv run python scripts/z_generate_manuscript_variables.py   # tokens + resolved manuscript + figures
+```
+
+## Architecture contract
 
 | Surface | Rule |
 |---|---|
-| `src/for_your_eyes_only/key_escrow.py`, `key_recovery.py`, `underwater_retrieval.py`, `island_routing.py`, `targeting.py`, `acoustic_link.py` | Pure domain mathematics — **no** `infrastructure.*`, no `bond_api` imports; importable standalone |
-| `src/for_your_eyes_only/mission.py` | Thin adapter implementing the **frozen** `bond_api.MissionProvider` + `GadgetRegistry` + `canonical_mission()` single source of truth |
-| `scripts/` | Thin per-phase orchestrators (business logic stays in `src/`) |
-| `src/for_your_eyes_only/figures.py` | Deterministic matplotlib figure generation (Agg backend) |
-| manuscript tokens | Injected from `manuscript/config.yaml` + `src/.../manuscript_variables.py` + `canonical_mission()`; never hand-authored metrics |
+| `src/for_your_eyes_only/{key_escrow,key_recovery,underwater_retrieval,island_routing,targeting,acoustic_link}.py` | Pure domain mathematics — no `infrastructure.*`, no `bond_api`; importable standalone |
+| `src/for_your_eyes_only/mission.py` | The only adapter: frozen `bond_api.MissionProvider` + `GADGETS` + `canonical_mission()` single source of truth |
+| `src/for_your_eyes_only/figures.py` | Deterministic matplotlib rendering (`Agg` backend) |
+| `src/for_your_eyes_only/manuscript_variables.py` | Token hydration; `METRIC_TOKENS` derived, never hand-listed |
+| `scripts/` | Thin orchestrators — argument handling, imports, output formatting; no business logic |
+| `manuscript/` | Tokenised prose; metrics injected from code, never hand-authored |
 
 ## Hard guardrails
 
 - **Scope exactly this package** — never touch siblings, bond-root files, or
   the template repo.
-- **No mocks** — real data + computation only; zero `MagicMock`/`unittest.mock`.
-- **≥90% line+branch on `src/`** — `uv run python -m pytest tests/ --cov=src --cov-fail-under=90`.
-- **Deterministic** — fixed seeds, no untracked RNG, no wall-clock in artifacts.
-- **Thin scripts** — logic lives in `src/`.
+- **Frozen protocol** — `brief`/`recon`/`plan`/`execute`/`debrief` and the
+  module-level `GADGETS` registry keep their public shape. Deepen inside;
+  never break discovery.
+- **No mocks** — no `MagicMock`, `unittest.mock`, or `mocker.patch`. Real data
+  and real computation; use a real injectable seam when a failure path needs
+  driving.
+- **≥90% line+branch on `src/`**, zero failures, zero skips.
+- **Deterministic** — one fixed seed (`mission.MISSION_SEED`), no untracked
+  RNG, no wall-clock value in any persisted artifact.
+- **Thin scripts** — computation lives in `src/`.
 - **ruff + mypy clean** on `src/` and `scripts/`.
+- **No hand-authored metrics** — every manuscript number is a token computed
+  from `canonical_mission()`.
 
-## Protocol integration
+## Package-specific traps
 
-The frozen `bond-api` protocol is a local path dependency
-(`[tool.uv.sources] bond-api = { path = ".../bond-api" }`). `mission.py`
-exposes `MissionProvider` at module top level under a stable name so the
-orchestrator's `load_provider("for_your_eyes_only")` discovers it. The public
-protocol surface and the module-level `GADGETS` convention are stable across
-phases — bond-cli, the coordinator reconcile, and the orchestrator consume them
-unchanged; only the internal mission scenario deepens.
+- **`canonical_mission()` is the single source of truth.** Computing a mission
+  quantity anywhere else creates a second source that can disagree. Add a field
+  to `CanonicalMission` instead.
+- **Verdicts must be derivable.** `fingerprint_match` is recomputed and
+  compared, not stapled to `True`, because `00_preflight.py` reads it as a
+  pass/fail verdict. Before adding a boolean, ask what input would make it
+  False; if there is no answer, it is not a check.
+- **`manuscript/config.yaml`'s `mission:` block is a mirror, not an input.** It
+  is pinned to the `mission.py` constants by `tests/test_config_consistency.py`.
+  Change a constant, change the block. Never add a value nothing reads.
+- **The erasure decoder's generality is the feature.** `recover_erasure` takes
+  an explicit surviving-fragment `indices` set; the exhaustive combination test
+  is what makes the any-`k` claim real. Keep it.
+- **`__all__` is hand-maintained** — add new public functions to it.
 
-## Verification
+## Verification checklist
 
 ```bash
-uv run python -m pytest tests/ --cov=src --cov-fail-under=90
-uv run ruff check src/ scripts/ tests/
-uv run ruff format --check src/ scripts/ tests/
+uv run pytest tests/ --cov=src --cov-fail-under=90
+uv run ruff check src/ scripts/ tests/ && uv run ruff format --check src/ scripts/ tests/
 uv run mypy src/ scripts/
-# lineage: no leftover template strings (verification-check descriptions only)
+uv run python scripts/00_preflight.py
+
+# lineage: exemplar identifiers only permitted in prose that explains the lineage
 rg -n "template[_]code_project" . --glob '!uv.lock' --glob '!.git/**'
+# no-mock policy
+rg -n "MagicMock|unittest\.mock|mocker\.patch" tests/
+
+git status   # must be clean after committing
 ```
+
+Report the coverage percentage and test count you actually observed, the commit
+SHA, and anything you could not verify. A gate you did not run is not a gate
+that passed.
 
 ## Key files
 
-- `src/for_your_eyes_only/key_escrow.py` — escrow/recovery protocol (Shamir).
-- `src/for_your_eyes_only/key_recovery.py` — erasure-coded key recovery.
-- `src/for_your_eyes_only/underwater_retrieval.py` — dive/drift planning.
-- `src/for_your_eyes_only/island_routing.py` — Ionian insertion routing.
+- `src/for_your_eyes_only/key_escrow.py` — Shamir escrow, commitments, custody chain, quorum release.
+- `src/for_your_eyes_only/key_recovery.py` — erasure-coded any-`k`-of-`n` key recovery.
+- `src/for_your_eyes_only/underwater_retrieval.py` — Haldane dive/decompression and drift planning.
+- `src/for_your_eyes_only/island_routing.py` — Ionian insertion routing (Dijkstra / A\*).
 - `src/for_your_eyes_only/targeting.py` — fire-control intercept solution.
 - `src/for_your_eyes_only/acoustic_link.py` — underwater acoustic link budget.
-- `src/for_your_eyes_only/mission.py` — frozen-protocol provider + gadgets +
-  canonical scenario.
-- `manuscript/config.yaml` — mission + metadata configuration.
+- `src/for_your_eyes_only/mission.py` — frozen-protocol provider, gadgets, canonical scenario.
+- `manuscript/config.yaml` — paper metadata plus the checked mission mirror.

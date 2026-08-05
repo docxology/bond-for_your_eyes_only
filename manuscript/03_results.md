@@ -11,6 +11,12 @@ releases the key deterministically. The reconstructed key is
 ({{RESULT_RECOVERED_MATCH}}). A smaller quorum is rejected, and a tampered
 share fails verification before release.
 
+That confirmation is *re-derived*, not asserted: the SHA-256 fingerprint of the
+released key is recomputed and compared against the one the escrow stored. This
+matters because the preflight check treats the same value as a pass/fail
+verdict — had it been a stapled literal, the verdict could never have failed
+and would have reported success regardless of what release returned.
+
 ## Erasure-coded key recovery
 
 The released key is encoded as {{RESULT_RECOVERY_DATA_SYMBOLS}} data symbols
@@ -18,6 +24,14 @@ into {{RESULT_RECOVERY_CODE_SYMBOLS}} code fragments over GF(p). Any
 {{RESULT_RECOVERY_DATA_SYMBOLS}} fragments recover the key (recovered matches
 original: {{RESULT_RECOVERY_MATCH}}), and a corrupted fragment is detected by
 the integrity checksum before it can yield a wrong key.
+
+The any-`k` claim is tested as stated rather than in its easy form: the decoder
+takes an explicit set of surviving fragment positions, and the test suite
+enumerates *every* combination of surviving fragments — including sets that
+contain none of the leading ones — and requires each to reconstruct the key.
+Requesting checksum verification when no checksum symbol is present is an
+error rather than a silent skip, so a caller asking to be protected is never
+told that nothing was wrong.
 
 ## Underwater retrieval
 
@@ -54,9 +68,11 @@ intercept geometry is shown in Figure {@fig:targeting_geometry}.
 ## Acoustic link budget
 
 At the {{RESULT_LINK_RANGE_M}}-m operating range the ATAC uplink receives
-{{RESULT_LINK_SNR_DB}} dB (path loss {{RESULT_LINK_TL_DB}} dB) against an 8 dB
-detection threshold; the link closes ({{RESULT_LINK_CLOSES}}) with a maximum
-acoustic range of {{RESULT_LINK_MAX_RANGE_M}} m. The SNR-vs-range curve is
-shown in Figure {@fig:acoustic_link}.
+{{RESULT_LINK_SNR_DB}} dB (path loss {{RESULT_LINK_TL_DB}} dB) against a
+{{RESULT_LINK_THRESHOLD_DB}} dB detection threshold, leaving a margin of
+{{RESULT_LINK_MARGIN_DB}} dB; the link closes ({{RESULT_LINK_CLOSES}}) with a
+maximum acoustic range of {{RESULT_LINK_MAX_RANGE_M}} m. Because the operating
+range sits inside that maximum, the uplink is not run at the edge of its
+budget. The SNR-vs-range curve is shown in Figure {@fig:acoustic_link}.
 
 ![ATAC underwater acoustic link budget](acoustic_link.png){#fig:acoustic_link}

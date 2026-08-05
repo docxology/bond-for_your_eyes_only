@@ -1,5 +1,7 @@
 """Real-data tests for the ATAC erasure-coded key recovery module."""
 
+import itertools
+
 import pytest
 
 from for_your_eyes_only import key_recovery as kr
@@ -16,14 +18,55 @@ def test_encode_recover_roundtrip():
 
 
 def test_any_k_fragments_recover():
-    """Erasure property: any k of the n code symbols reconstruct the key."""
+    """Erasure property: *any* k of the n code symbols reconstruct the key.
+
+    The leading-k case is the easy one and proves nothing about erasure — it is
+    what a decoder that ignored fragment positions would also pass. Every
+    non-leading combination must work too.
+    """
     code = kr.ErasureCode(data_symbols=3, code_symbols=5)
     data = (10, 20, 30)
     encoded = kr.encode_erasure(data, code, checksum=False)
     assert len(encoded) == 5
-    # use only the first 3 (data-carrying portion) -> still recovers
-    recovered = kr.recover_erasure(encoded[:3], code, checksum=False)
-    assert recovered == data
+
+    combos = list(itertools.combinations(range(5), 3))
+    assert len(combos) == 10
+    for survivors in combos:
+        recovered = kr.recover_erasure(encoded, code, checksum=False, indices=survivors)
+        assert recovered == data, f"fragments {survivors} failed to recover the key"
+
+    # Explicitly include a set containing none of the leading fragments.
+    assert kr.recover_erasure(encoded, code, checksum=False, indices=(2, 3, 4)) == data
+
+
+def test_any_k_fragments_recover_with_checksum():
+    """The erasure property survives the checksum-carrying encoding too."""
+    code = kr.ErasureCode(data_symbols=4, code_symbols=6)
+    data = (11, 22, 33, 44)
+    encoded = kr.encode_erasure(data, code)
+    assert len(encoded) == 7
+    # Fragments 0 and 1 are "lost": decode from the trailing four.
+    assert kr.recover_erasure(encoded, code, indices=(2, 3, 4, 5)) == data
+
+
+def test_recover_rejects_bad_index_sets():
+    code = kr.ErasureCode(data_symbols=3, code_symbols=5)
+    encoded = kr.encode_erasure((1, 2, 3), code, checksum=False)
+    with pytest.raises(ValueError, match="exactly 3"):
+        kr.recover_erasure(encoded, code, checksum=False, indices=(0, 1))
+    with pytest.raises(ValueError, match="distinct"):
+        kr.recover_erasure(encoded, code, checksum=False, indices=(0, 1, 1))
+    with pytest.raises(ValueError, match="out of range"):
+        kr.recover_erasure(encoded, code, checksum=False, indices=(0, 1, 99))
+
+
+def test_requested_checksum_without_checksum_symbol_is_an_error():
+    """Asking to be protected when there is nothing to check must not pass silently."""
+    code = kr.ErasureCode(data_symbols=4, code_symbols=6)
+    encoded = kr.encode_erasure((1, 2, 3, 4), code, checksum=False)
+    assert len(encoded) == 6
+    with pytest.raises(ValueError, match="no checksum symbol present"):
+        kr.recover_erasure(encoded, code, checksum=True)
 
 
 def test_deterministic_encoding():
@@ -65,10 +108,10 @@ def test_validation():
         kr.ErasureCode(data_symbols=5, code_symbols=2)  # k > n
     with pytest.raises(ValueError):
         kr.ErasureCode(data_symbols=2, code_symbols=PRIME)  # n >= p
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="expected 3 data symbols"):
         kr.encode_erasure((1, 2), kr.ErasureCode(3, 5))
-    with pytest.raises(ValueError):
-        kr.recover_erasure((1, 2), kr.ErasureCode(4, 6))
+    with pytest.raises(ValueError, match="need at least 4 code symbols"):
+        kr.recover_erasure((1, 2), kr.ErasureCode(4, 6), checksum=False)
 
 
 def test_fields_in_field():

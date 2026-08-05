@@ -29,9 +29,11 @@ from dataclasses import dataclass
 from typing import Callable
 
 __all__ = [
+    "Edge",
     "IslandGraph",
     "RoutePlan",
     "build_ionian_graph",
+    "edge_distance",
     "make_route_cost",
     "plan_route",
 ]
@@ -219,12 +221,19 @@ def plan_route(
         path.append(cur)
     path.reverse()
 
-    total_distance = sum(_edge_distance(graph, path[i], path[i + 1]) for i in range(len(path) - 1))
+    total_distance = sum(edge_distance(graph, path[i], path[i + 1]) for i in range(len(path) - 1))
     return RoutePlan(path=tuple(path), total_cost=dist[destination], distance_nm=total_distance)
 
 
-def _edge_distance(graph: IslandGraph, a: str, b: str) -> float:
+def edge_distance(graph: IslandGraph, a: str, b: str) -> float:
+    """Return the graph distance (nm) along the edge ``a -> b``.
+
+    Raises ``KeyError`` when the two nodes are not adjacent. Consecutive nodes
+    of a planned route are adjacent by construction, so a miss here means the
+    caller passed a non-route pair — a straight-line guess would silently
+    understate the distance instead of surfacing that mistake.
+    """
     for edge in graph.neighbors(a):
         if edge.destination == b:
             return edge.distance_nm
-    return graph.straight_line(a, b)
+    raise KeyError(f"no edge between {a!r} and {b!r}")
