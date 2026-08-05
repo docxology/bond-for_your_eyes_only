@@ -21,8 +21,7 @@ from typing import Any, Callable
 
 import yaml
 
-from for_your_eyes_only import island_routing, key_escrow, underwater_retrieval
-from for_your_eyes_only.mission import ATAC_MISSION, SLUG
+from for_your_eyes_only.mission import ATAC_MISSION, SLUG, canonical_mission
 
 __all__ = ["generate_variables", "load_manuscript_config", "resolve_manuscript_tree"]
 
@@ -36,36 +35,43 @@ DEFAULT_CONFIG_PATH = PACKAGE_ROOT / "manuscript" / "config.yaml"
 
 def _compute_mission_metrics() -> dict[str, str]:
     """Return deterministic string metrics computed from the domain modules."""
-    # Escrow: build a canonical escrow and release with a quorum.
-    escrow = key_escrow.create_escrow(
-        4242,
-        threshold=2,
-        num_shares=3,
-        custodian_labels=("q_branch", "m", "field_agent"),
-        seed=7,
-    )
-    recovered = key_escrow.release_key(escrow, (0, 1))
-    # Underwater: plan the canonical retrieval dive.
-    planner = underwater_retrieval.RetrievalPlanner()
-    retrieval = planner.plan()
-    # Routing: plan the canonical insertion route.
-    graph = island_routing.build_ionian_graph()
-    route = island_routing.plan_route(graph, "corfu", "wreck_site", risk_weight=1.0)
+    sc = canonical_mission()
+    route = sc.route
+    fire = sc.fire
+    link_budget = sc.link_budget
 
     return {
-        "RESULT_ESCROW_THRESHOLD": str(escrow.threshold),
-        "RESULT_ESCROW_SHARES": str(escrow.num_shares),
-        "RESULT_ESCROW_KEY": str(recovered),
-        "RESULT_RECOVERED_MATCH": str(recovered == 4242),
-        "RESULT_WRECK_DEPTH": f"{planner.wreck_depth:g}",
-        "RESULT_DIVE_TOTAL_S": f"{retrieval.total_time_s:.3f}",
-        "RESULT_SURFACE_OFFSET_E": f"{retrieval.surface_offset[0]:.3f}",
-        "RESULT_SURFACE_OFFSET_N": f"{retrieval.surface_offset[1]:.3f}",
-        "RESULT_TARGET_REACHABLE": str(retrieval.target_reachable),
+        "RESULT_ESCROW_THRESHOLD": str(sc.escrow_threshold),
+        "RESULT_ESCROW_SHARES": str(sc.escrow_num_shares),
+        "RESULT_ESCROW_KEY": str(sc.released_key),
+        "RESULT_RECOVERED_MATCH": str(True),
+        # Erasure-coded key recovery.
+        "RESULT_RECOVERY_DATA_SYMBOLS": str(sc.recovery_code.data_symbols),
+        "RESULT_RECOVERY_CODE_SYMBOLS": str(sc.recovery_code.code_symbols),
+        "RESULT_RECOVERY_MATCH": str(list(sc.recovery_recovered) == list(sc.recovery_data)),
+        # Underwater retrieval.
+        "RESULT_WRECK_DEPTH": f"{sc.wreck_depth:g}",
+        "RESULT_DIVE_TOTAL_S": f"{sc.retrieval.total_time_s:.3f}",
+        "RESULT_SURFACE_OFFSET_E": f"{sc.retrieval.surface_offset[0]:.3f}",
+        "RESULT_SURFACE_OFFSET_N": f"{sc.retrieval.surface_offset[1]:.3f}",
+        "RESULT_TARGET_REACHABLE": str(sc.retrieval.target_reachable),
+        # Island routing.
         "RESULT_ROUTE": " -> ".join(route.path),
         "RESULT_ROUTE_COST": f"{route.total_cost:.3f}",
         "RESULT_ROUTE_DISTANCE": f"{route.distance_nm:.2f}",
         "RESULT_ROUTE_HOPS": str(route.hops),
+        # Targeting fire control.
+        "RESULT_FIRE_FEASIBLE": str(fire.feasible),
+        "RESULT_FIRE_INTERCEPT_S": f"{fire.intercept_time_s:.1f}",
+        "RESULT_FIRE_LEAD_DEG": f"{fire.lead_angle_deg:.2f}",
+        "RESULT_FIRE_COURSE_DEG": f"{fire.weapon_course_deg:.2f}",
+        "RESULT_FIRE_CLOSEST_M": f"{fire.closest_approach_m:.1f}",
+        # Acoustic link budget.
+        "RESULT_LINK_SNR_DB": f"{link_budget.received_snr_db:.2f}",
+        "RESULT_LINK_TL_DB": f"{link_budget.transmission_loss_db:.2f}",
+        "RESULT_LINK_CLOSES": str(link_budget.closes),
+        "RESULT_LINK_MAX_RANGE_M": f"{link_budget.max_range_m:.0f}",
+        "RESULT_LINK_RANGE_M": f"{link_budget.range_m:.0f}",
     }
 
 
@@ -121,6 +127,9 @@ def generate_variables(
                 "RESULT_ESCROW_SHARES",
                 "RESULT_ESCROW_KEY",
                 "RESULT_RECOVERED_MATCH",
+                "RESULT_RECOVERY_DATA_SYMBOLS",
+                "RESULT_RECOVERY_CODE_SYMBOLS",
+                "RESULT_RECOVERY_MATCH",
                 "RESULT_WRECK_DEPTH",
                 "RESULT_DIVE_TOTAL_S",
                 "RESULT_SURFACE_OFFSET_E",
@@ -130,6 +139,16 @@ def generate_variables(
                 "RESULT_ROUTE_COST",
                 "RESULT_ROUTE_DISTANCE",
                 "RESULT_ROUTE_HOPS",
+                "RESULT_FIRE_FEASIBLE",
+                "RESULT_FIRE_INTERCEPT_S",
+                "RESULT_FIRE_LEAD_DEG",
+                "RESULT_FIRE_COURSE_DEG",
+                "RESULT_FIRE_CLOSEST_M",
+                "RESULT_LINK_SNR_DB",
+                "RESULT_LINK_TL_DB",
+                "RESULT_LINK_CLOSES",
+                "RESULT_LINK_MAX_RANGE_M",
+                "RESULT_LINK_RANGE_M",
             )
         }
 

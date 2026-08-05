@@ -3,25 +3,30 @@
 **{{BOND_TITLE}}** — {{BOND_SUBTITLE}}.
 
 This report documents the **ATAC** special-agent mission software: a
-deterministic suite for recovering a lost targeting-communicator device. The
-mission's mathematics rest on three pillars, each implemented as a pure,
-infrastructure-free domain module:
+deterministic suite for recovering a lost targeting-communicator device and
+directing it onto target. The mission's mathematics rest on six pillars, each
+implemented as a pure, infrastructure-free domain module:
 
-1. **Key escrow and recovery** — the ATAC key is split among
-   {{RESULT_ESCROW_SHARES}} custodians using Shamir secret sharing over a
-   finite field, with a quorum of {{RESULT_ESCROW_THRESHOLD}} required to
-   release it. Recovery reconstructs the key ({{RESULT_ESCROW_KEY}}) and
-   confirms it against the escrow fingerprint (match: {{RESULT_RECOVERED_MATCH}}).
-2. **Underwater retrieval planning** — a Haldane-style model plans a staged
-   dive to the wreck at {{RESULT_WRECK_DEPTH}} m, compensating for current
-   drift (surface offset ≈ ({{RESULT_SURFACE_OFFSET_E}},
-   {{RESULT_SURFACE_OFFSET_N}}) m) over a total dive time of
-   {{RESULT_DIVE_TOTAL_S}} s. Target reachability:
-   {{RESULT_TARGET_REACHABLE}}.
-3. **Greek-island insertion routing** — a weighted Ionian-island graph routes
-   the insertion from the staging base to the wreck site via a least-cost
-   path ({{RESULT_ROUTE}}; {{RESULT_ROUTE_HOPS}} hops, distance
-   {{RESULT_ROUTE_DISTANCE}} nm, cost {{RESULT_ROUTE_COST}}).
+1. **Key escrow** — the ATAC key is split among {{RESULT_ESCROW_SHARES}}
+   custodians using Shamir secret sharing, with a quorum of
+   {{RESULT_ESCROW_THRESHOLD}} required to release it (key
+   {{RESULT_ESCROW_KEY}}; match {{RESULT_RECOVERED_MATCH}}).
+2. **Erasure-coded key recovery** — {{RESULT_RECOVERY_DATA_SYMBOLS}} data
+   symbols encoded into {{RESULT_RECOVERY_CODE_SYMBOLS}} code fragments so any
+   quorum recovery survives loss/corruption (match
+   {{RESULT_RECOVERY_MATCH}}).
+3. **Underwater retrieval planning** — a Haldane-style staged dive to
+   ({{RESULT_SURFACE_OFFSET_E}}, {{RESULT_SURFACE_OFFSET_N}}) m drift offset
+   over {{RESULT_DIVE_TOTAL_S}} s to reach the {{RESULT_WRECK_DEPTH}}-m wreck
+   (reachable: {{RESULT_TARGET_REACHABLE}}).
+4. **Greek-island insertion routing** — a least-cost route
+   ({{RESULT_ROUTE}}, {{RESULT_ROUTE_DISTANCE}} nm).
+5. **Fire-control targeting** — an intercept lead-angle firing solution
+   ({{RESULT_FIRE_INTERCEPT_S}} s, {{RESULT_FIRE_LEAD_DEG}}° lead;
+   feasible {{RESULT_FIRE_FEASIBLE}}).
+6. **Underwater acoustic link** — a link budget with SNR
+   {{RESULT_LINK_SNR_DB}} dB at {{RESULT_LINK_RANGE_M}} m (closes:
+   {{RESULT_LINK_CLOSES}}; max range {{RESULT_LINK_MAX_RANGE_M}} m).
 
 Every computation is deterministic — fixed seeds, no untracked randomness, no
 wall-clock dependence in persisted artifacts — and each concept carries a

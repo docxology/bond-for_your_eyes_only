@@ -11,6 +11,14 @@ releases the key deterministically. The reconstructed key is
 ({{RESULT_RECOVERED_MATCH}}). A smaller quorum is rejected, and a tampered
 share fails verification before release.
 
+## Erasure-coded key recovery
+
+The released key is encoded as {{RESULT_RECOVERY_DATA_SYMBOLS}} data symbols
+into {{RESULT_RECOVERY_CODE_SYMBOLS}} code fragments over GF(p). Any
+{{RESULT_RECOVERY_DATA_SYMBOLS}} fragments recover the key (recovered matches
+original: {{RESULT_RECOVERY_MATCH}}), and a corrupted fragment is detected by
+the integrity checksum before it can yield a wrong key.
+
 ## Underwater retrieval
 
 The retrieval dive to {{RESULT_WRECK_DEPTH}} m completes in
@@ -31,3 +39,24 @@ risk, favouring safe passages without abandoning the shortest corridor. The
 Ionian graph and planned route are shown in Figure {@fig:island_graph}.
 
 ![ATAC Ionian insertion route](island_graph.png){#fig:island_graph}
+
+## Targeting solution
+
+The ATAC fire-control solution for the canonical contact is feasible
+({{RESULT_FIRE_FEASIBLE}}) with an intercept time of {{RESULT_FIRE_INTERCEPT_S}}
+s, a lead angle of {{RESULT_FIRE_LEAD_DEG}}° and a weapon course of
+{{RESULT_FIRE_COURSE_DEG}}°; where a close is not achievable, the module
+reports the closest-approach distance ({{RESULT_FIRE_CLOSEST_M}} m). The
+intercept geometry is shown in Figure {@fig:targeting_geometry}.
+
+![ATAC targeting intercept geometry](targeting_geometry.png){#fig:targeting_geometry}
+
+## Acoustic link budget
+
+At the {{RESULT_LINK_RANGE_M}}-m operating range the ATAC uplink receives
+{{RESULT_LINK_SNR_DB}} dB (path loss {{RESULT_LINK_TL_DB}} dB) against an 8 dB
+detection threshold; the link closes ({{RESULT_LINK_CLOSES}}) with a maximum
+acoustic range of {{RESULT_LINK_MAX_RANGE_M}} m. The SNR-vs-range curve is
+shown in Figure {@fig:acoustic_link}.
+
+![ATAC underwater acoustic link budget](acoustic_link.png){#fig:acoustic_link}

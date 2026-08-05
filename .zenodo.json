@@ -6,14 +6,16 @@
       "orcid": "0000-0001-6232-9096"
     }
   ],
-  "description": "ATAC special-agent mission software for the For Your Eyes Only (1981) BOND film package: targeting-communicator key escrow/recovery, underwater retrieval planning, and Greek-island insertion routing.",
+  "description": "ATAC special-agent mission software for the For Your Eyes Only (1981) BOND film package: targeting-communicator key escrow/recovery and erasure coding, underwater retrieval planning, Greek-island insertion routing, fire-control targeting, and underwater acoustic link budgeting.",
   "keywords": [
     "key escrow and recovery",
     "Shamir secret sharing",
+    "erasure coding",
     "underwater retrieval planning",
     "decompression modelling",
     "island routing",
-    "Dijkstra shortest path",
+    "fire-control targeting",
+    "underwater acoustic link budget",
     "deterministic mission software"
   ],
   "license": "MIT",

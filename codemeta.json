@@ -17,10 +17,12 @@
   "keywords": [
     "key escrow and recovery",
     "Shamir secret sharing",
+    "erasure coding",
     "underwater retrieval planning",
     "decompression modelling",
     "island routing",
-    "Dijkstra shortest path",
+    "fire-control targeting",
+    "underwater acoustic link budget",
     "deterministic mission software"
   ],
   "license": "https://spdx.org/licenses/MIT",

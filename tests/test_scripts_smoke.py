@@ -39,7 +39,14 @@ def test_plan_prints_steps():
     assert proc.returncode == 0
     data = json.loads(proc.stdout)
     actions = [s["action"] for s in data["steps"]]
-    assert actions == ["release_key", "retrieval_planner.plan", "plan_route"]
+    assert actions == [
+        "release_key",
+        "recover_erasure",
+        "retrieval_planner.plan",
+        "plan_route",
+        "intercept_solution",
+        "compute_link_budget",
+    ]
 
 
 def test_execute_prints_outcome():
@@ -48,6 +55,8 @@ def test_execute_prints_outcome():
     data = json.loads(proc.stdout)
     assert data["success"] is True
     assert data["results"]["island_routing"]["path"][-1] == "wreck_site"
+    assert data["results"]["acoustic_link"]["closes"] is True
+    assert data["results"]["targeting"]["feasible"] is True
 
 
 def test_debrief_prints_lessons():

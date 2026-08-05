@@ -8,10 +8,12 @@ date-released: '2026-08-04'
 keywords:
 - key escrow and recovery
 - Shamir secret sharing
+- erasure coding
 - underwater retrieval planning
 - decompression modelling
 - island routing
-- Dijkstra shortest path
+- fire-control targeting
+- underwater acoustic link budget
 - deterministic mission software
 license: MIT
 message: If you use this software, please cite it using the metadata from this file.

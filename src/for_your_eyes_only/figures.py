@@ -14,6 +14,7 @@ Figures:
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import matplotlib
@@ -23,7 +24,8 @@ matplotlib.use("Agg")  # headless; deterministic render
 import matplotlib.axes
 import matplotlib.pyplot as plt  # noqa: E402
 
-from for_your_eyes_only import island_routing, underwater_retrieval
+from for_your_eyes_only import acoustic_link, island_routing, targeting, underwater_retrieval
+from for_your_eyes_only.mission import _LINK, _LINK_RANGE_M  # noqa: PLC2701 - canonical scenario
 
 #: Canonical figures output directory (under the package ``output/`` tree).
 DEFAULT_FIGURE_DIR = Path(__file__).resolve().parents[2] / "output" / "figures"
@@ -126,11 +128,107 @@ def render_dive_profile(
     return dest
 
 
+def render_targeting_geometry(
+    *,
+    output_path: str | Path | None = None,
+    target_range_m: float = 4000.0,
+    target_bearing_deg: float = 45.0,
+    target_course_deg: float = 120.0,
+    target_speed_ms: float = 8.0,
+    weapon_speed_ms: float = 45.0,
+) -> Path:
+    """Render the fire-control intercept geometry for the ATAC targeting solution."""
+    dest = Path(output_path) if output_path is not None else DEFAULT_FIGURE_DIR / "targeting_geometry.png"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    solution = targeting.intercept_solution(
+        target_range_m=target_range_m,
+        target_bearing_deg=target_bearing_deg,
+        target_course_deg=target_course_deg,
+        target_speed_ms=target_speed_ms,
+        weapon_speed_ms=weapon_speed_ms,
+    )
+    # Geometry in the plane.
+    tx = target_range_m * math.sin(math.radians(target_bearing_deg))
+    ty = target_range_m * math.cos(math.radians(target_bearing_deg))
+    # Weapon velocity vector from the solution course.
+    w_east = weapon_speed_ms * math.sin(math.radians(solution.weapon_course_deg))
+    w_north = weapon_speed_ms * math.cos(math.radians(solution.weapon_course_deg))
+    t_east, t_north = targeting.polar_to_velocity(target_speed_ms, target_course_deg)
+
+    fig, ax = plt.subplots(figsize=(7, 7))
+    # line of sight from launcher (0,0) to target
+    ax.plot([0, tx], [0, ty], color="#2980b9", lw=2, label="line of sight")
+    # weapon course vector (scaled)
+    ax.arrow(0, 0, w_east * 20, w_north * 20, head_width=80, color="#c0392b", label="weapon course")
+    # target velocity vector
+    ax.arrow(tx, ty, t_east * 250, t_north * 250, head_width=80, color="#27ae60", label="target velocity")
+    ax.plot([tx], [ty], "o", color="#e74c3c", ms=10, zorder=5)
+    ax.plot([0], [0], "o", color="#2c3e50", ms=10, zorder=5)
+    ax.annotate("launcher", (0, 0), xytext=(8, 8), textcoords="offset points")
+    ax.annotate("target", (tx, ty), xytext=(8, 8), textcoords="offset points")
+
+    feasible = solution.feasible
+    fe_label = "feasible" if feasible else "not feasible (closest approach shown)"
+    ax.set_title(f"ATAC fire-control intercept — lead angle {solution.lead_angle_deg:.2f}° ({fe_label})")
+    ax.set_xlabel("East (m)")
+    ax.set_ylabel("North (m)")
+    ax.legend(fontsize=8, loc="best")
+    ax.grid(True, alpha=0.3)
+    ax.axis("equal")
+    fig.tight_layout()
+    fig.savefig(dest, dpi=150)
+    plt.close(fig)
+    return dest
+
+
+def render_acoustic_link(
+    *,
+    output_path: str | Path | None = None,
+    link: acoustic_link.AcousticLink | None = None,
+    range_m: float = _LINK_RANGE_M,
+) -> Path:
+    """Render the underwater acoustic link SNR-vs-range curve and closure point."""
+    dest = Path(output_path) if output_path is not None else DEFAULT_FIGURE_DIR / "acoustic_link.png"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    link = link if link is not None else _LINK
+    max_range = acoustic_link.max_link_range(link)
+    ranges = [float(r) for r in range(100, int(max_range * 1.5), 100)]
+    snr_curve = [acoustic_link.received_snr(link, r) for r in ranges]
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot([r / 1000.0 for r in ranges], snr_curve, color="#2980b9", lw=2)
+    ax.axhline(link.detection_threshold_db, color="#c0392b", ls="--", alpha=0.8, label="detection threshold")
+    op_snr = acoustic_link.received_snr(link, range_m)
+    ax.plot(
+        [range_m / 1000.0],
+        [op_snr],
+        "o",
+        color="#27ae60",
+        ms=9,
+        zorder=5,
+        label=f"operating ({range_m / 1000:.1f} km, {op_snr:.1f} dB)",
+    )
+    ax.axvline(max_range / 1000.0, color="#8e44ad", ls=":", alpha=0.7, label=f"max range {max_range / 1000:.1f} km")
+    ax.set_title(f"ATAC underwater acoustic link budget ({link.frequency_khz:.0f} kHz)")
+    ax.set_xlabel("Range (km)")
+    ax.set_ylabel("Received SNR (dB)")
+    ax.legend(fontsize=8)
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(dest, dpi=150)
+    plt.close(fig)
+    return dest
+
+
 def render_all(*, figure_dir: str | Path | None = None) -> tuple[Path, ...]:
     """Render every default figure; returns the written paths (sorted)."""
     base = Path(figure_dir) if figure_dir is not None else DEFAULT_FIGURE_DIR
     paths = [
         render_island_graph(output_path=base / "island_graph.png"),
         render_dive_profile(output_path=base / "dive_profile.png"),
+        render_targeting_geometry(output_path=base / "targeting_geometry.png"),
+        render_acoustic_link(output_path=base / "acoustic_link.png"),
     ]
     return tuple(sorted(paths))

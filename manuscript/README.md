@@ -29,6 +29,13 @@ Figures are referenced via Pandoc-crossref `[@fig:label]` / `{#fig:label}`
 (see §3). Generators live in `src/for_your_eyes_only/figures.py` and render
 deterministically to `output/figures/`.
 
+| Label | PNG filename | Generator |
+|---|---|---|
+| `{#fig:island_graph}` | `island_graph.png` | `render_island_graph` |
+| `{#fig:dive_profile}` | `dive_profile.png` | `render_dive_profile` |
+| `{#fig:targeting_geometry}` | `targeting_geometry.png` | `render_targeting_geometry` |
+| `{#fig:acoustic_link}` | `acoustic_link.png` | `render_acoustic_link` |
+
 ## Reproduction
 
 ```bash

@@ -16,8 +16,9 @@ The generation orchestrator writes:
 
 * `output/data/manuscript_variables.json` — the full token map.
 * `output/manuscript/` — resolved manuscript sections (no raw braces).
-* `output/figures/island_graph.png`, `output/figures/dive_profile.png` —
-  deterministic figure set.
+* `output/figures/island_graph.png`, `output/figures/dive_profile.png`,
+  `output/figures/targeting_geometry.png`, `output/figures/acoustic_link.png` —
+  the deterministic figure set.
 
 Regenerating the tree reproduces byte-identical, git-clean output, a live
 proof of determinism.
@@ -25,6 +26,9 @@ proof of determinism.
 ## Test results
 
 The suite covers, per module: escrow split/recover round-trips, commitment
-verification, quorum rejection and tamper rejection; underwater descent/ascent
-scheduling, drift compensation, reachability edges; and routing optimality,
-risk sensitivity, and unknown-node errors. See `tests/`.
+verification, quorum rejection and tamper rejection; erasure encode/recover
+round-trips, any-k recovery, checksum corruption detection; underwater
+descent/ascent scheduling, drift compensation, reachability edges; routing
+optimality, risk sensitivity, and unknown-node errors; fire-control intercept
+feasibility, lead-angle geometry, closest-approach fallback; and acoustic-link
+path loss, SNR monotonicity, and bisection closure. See `tests/`.

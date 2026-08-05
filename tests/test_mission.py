@@ -33,21 +33,38 @@ def test_recon_returns_findings():
     assert {"goal", "escrow", "constraints"} <= labels
 
 
-def test_plan_sequences_three_concepts():
+def test_plan_sequences_concepts():
     provider = MissionProvider()
     plan = provider.plan(provider.brief())
     actions = [s.action for s in plan.steps]
-    assert actions == ["release_key", "retrieval_planner.plan", "plan_route"]
+    assert actions == [
+        "release_key",
+        "recover_erasure",
+        "retrieval_planner.plan",
+        "plan_route",
+        "intercept_solution",
+        "compute_link_budget",
+    ]
 
 
 def test_execute_produces_deterministic_results():
     provider = MissionProvider()
     outcome = provider.execute(provider.plan(provider.brief()))
     assert outcome.success is True
-    assert set(outcome.results.keys()) == {"escrow_release", "underwater_retrieval", "island_routing"}
+    assert set(outcome.results.keys()) == {
+        "escrow_release",
+        "key_recovery",
+        "underwater_retrieval",
+        "island_routing",
+        "targeting",
+        "acoustic_link",
+    }
     assert outcome.results["escrow_release"]["fingerprint_match"] is True
+    assert outcome.results["key_recovery"]["matches"] is True
     assert len(outcome.results["island_routing"]["path"]) >= 2
     assert outcome.results["underwater_retrieval"]["target_reachable"] is True
+    assert outcome.results["targeting"]["feasible"] is True
+    assert outcome.results["acoustic_link"]["closes"] is True
     # determinism: identical input hash
     again = provider.execute(provider.plan(provider.brief()))
     assert outcome.provenance.input_hash == again.provenance.input_hash

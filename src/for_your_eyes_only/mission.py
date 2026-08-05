@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import hashlib
 import random
+from dataclasses import dataclass
 
 from bond_api.protocol import (
     Asset,
@@ -40,7 +41,14 @@ from bond_api.protocol import (
     Step,
 )
 
-from for_your_eyes_only import island_routing, key_escrow, underwater_retrieval
+from for_your_eyes_only import (
+    acoustic_link,
+    island_routing,
+    key_escrow,
+    key_recovery,
+    targeting,
+    underwater_retrieval,
+)
 
 __all__ = ["ATAC_MISSION", "GADGETS", "MissionProvider", "build_gadgets"]
 
@@ -56,6 +64,23 @@ _SEED = 7
 _ESCROW_THRESHOLD = 2
 _ESCROW_SHARES = 3
 _CUSTODIANS = ("q_branch", "m", "field_agent")
+#: Erasure-code geometry used for the recovered-key fragments.
+_RECOVERY_DATA_SYMBOLS = 4
+_RECOVERY_CODE_SYMBOLS = 6
+#: Acoustic link configuration for the ATAC underwater uplink. The wreck
+#: uplink is a shallow-water horizontal channel (range >> depth), so it uses
+#: cylindrical spreading (spreading=1.0). Tuned so the 3.5 km operating range
+#: closes with margin and max_range is interior to the plan.
+_LINK = acoustic_link.AcousticLink(
+    frequency_khz=15.0,
+    source_level_db=145.0,
+    noise_level_db=55.0,
+    directivity_index_db=10.0,
+    detection_threshold_db=8.0,
+    spreading=1.0,
+)
+#: Operating range (m) at which the link budget is evaluated (wreck uplink).
+_LINK_RANGE_M = 3500.0
 
 
 #: The ATAC key to escrow (derived deterministically from the seed).
@@ -78,7 +103,7 @@ def build_gadgets() -> dict[str, object]:
     """Return the mapping of ATAC gadget name → callable/state.
 
     Gadgets are the domain capabilities the orchestrator may register or
-    invoke: an escrow instance plus the pure routing/retrieval builders.
+    invoke: an escrow instance plus the pure routing/retrieval/builders.
     Deterministic: the escrow is created with the fixed seed/quorum.
     """
     return {
@@ -88,6 +113,12 @@ def build_gadgets() -> dict[str, object]:
         "plan_route": island_routing.plan_route,
         "build_ionian_graph": island_routing.build_ionian_graph,
         "retrieval_planner": underwater_retrieval.RetrievalPlanner,
+        "targeting": targeting.intercept_solution,
+        "encode_erasure": key_recovery.encode_erasure,
+        "recover_erasure": key_recovery.recover_erasure,
+        "erasure_code": key_recovery.ErasureCode(_RECOVERY_DATA_SYMBOLS, _RECOVERY_CODE_SYMBOLS),
+        "acoustic_link": _LINK,
+        "compute_link_budget": acoustic_link.compute_link_budget,
     }
 
 
@@ -99,6 +130,69 @@ def _input_hash(*values: object) -> str:
     """Stable fingerprint of mission inputs for provenance auditability."""
     payload = "|".join(str(v) for v in values)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+# --------------------------------------------------------------------------- #
+# Canonical mission scenario (single source of truth for mission + manuscript)
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class CanonicalMission:
+    """The deterministic ATAC mission scenario, computed once, shared everywhere.
+
+    Both ``MissionProvider.execute`` and ``manuscript_variables`` draw from a
+    single :class:`CanonicalMission` so the outcome ``results`` and the
+    manuscript ``{{TOKEN}}``s can never disagree.
+    """
+
+    released_key: int
+    escrow_threshold: int
+    escrow_num_shares: int
+    recovery_code: key_recovery.ErasureCode
+    recovery_data: tuple[int, ...]
+    recovery_encoded: tuple[int, ...]
+    recovery_recovered: tuple[int, ...]
+    retrieval: underwater_retrieval.RetrievalPlan
+    route: island_routing.RoutePlan
+    fire: targeting.FireControlSolution
+    link_budget: acoustic_link.LinkBudget
+    wreck_depth: float
+
+
+def canonical_mission() -> CanonicalMission:
+    """Compute the deterministic ATAC mission outputs as typed domain objects."""
+    escrow_key = key_escrow.release_key(_ATAN_ESCROW, tuple(range(_ATAN_ESCROW.threshold)))
+    recovery_code = key_recovery.ErasureCode(_RECOVERY_DATA_SYMBOLS, _RECOVERY_CODE_SYMBOLS)
+    data = tuple((escrow_key + i) % key_recovery.ERASURE_PRIME for i in range(_RECOVERY_DATA_SYMBOLS))
+    encoded = key_recovery.encode_erasure(data, recovery_code)
+    recovered = key_recovery.recover_erasure(encoded, recovery_code)
+    planner = underwater_retrieval.RetrievalPlanner()
+    retrieval = planner.plan()
+    graph = island_routing.build_ionian_graph()
+    route = island_routing.plan_route(graph, "corfu", "wreck_site", risk_weight=1.0)
+    fire = targeting.intercept_solution(
+        target_range_m=4000.0,
+        target_bearing_deg=45.0,
+        target_course_deg=120.0,
+        target_speed_ms=8.0,
+        weapon_speed_ms=45.0,
+    )
+    link_budget = acoustic_link.compute_link_budget(_LINK, _LINK_RANGE_M)
+    return CanonicalMission(
+        released_key=escrow_key,
+        escrow_threshold=_ATAN_ESCROW.threshold,
+        escrow_num_shares=_ATAN_ESCROW.num_shares,
+        recovery_code=recovery_code,
+        recovery_data=data,
+        recovery_encoded=encoded,
+        recovery_recovered=recovered,
+        retrieval=retrieval,
+        route=route,
+        fire=fire,
+        link_budget=link_budget,
+        wreck_depth=underwater_retrieval.DEFAULT_WRECK_DEPTH,
+    )
 
 
 class MissionProvider:  # noqa: N801 — class name fixed by the discovery contract
@@ -155,7 +249,7 @@ class MissionProvider:  # noqa: N801 — class name fixed by the discovery contr
         )
 
     def plan(self, brief: MissionBrief) -> MissionPlan:
-        """Sequence the three concept operations into deterministic steps."""
+        """Sequence the concept operations into deterministic steps."""
         return MissionPlan(
             steps=(
                 Step(
@@ -163,6 +257,7 @@ class MissionProvider:  # noqa: N801 — class name fixed by the discovery contr
                     action="release_key",
                     params={"quorum": _ESCROW_THRESHOLD, "asset": brief.assets[0].name},
                 ),
+                Step(name="key_recovery", action="recover_erasure", params={"code": "6-of-4"}),
                 Step(
                     name="underwater_retrieval",
                     action="retrieval_planner.plan",
@@ -173,36 +268,47 @@ class MissionProvider:  # noqa: N801 — class name fixed by the discovery contr
                     action="plan_route",
                     params={"origin": "corfu", "destination": "wreck_site"},
                 ),
+                Step(name="targeting", action="intercept_solution", params={"weapon_speed_ms": 45.0}),
+                Step(
+                    name="acoustic_link",
+                    action="compute_link_budget",
+                    params={"range_m": _LINK_RANGE_M, "frequency_khz": _LINK.frequency_khz},
+                ),
             )
         )
 
     def execute(self, plan: MissionPlan) -> MissionOutcome:
         """Run each planned step deterministically against the domain modules."""
         results: dict[str, object] = {}
+        sc = canonical_mission()
 
         # Step 1 — escrow release: a verified quorum reconstructs the key.
         escrow = _ATAN_ESCROW
-        quorum_indices = tuple(range(escrow.threshold))
-        recovered = key_escrow.release_key(escrow, quorum_indices)
         results["escrow_release"] = {
             "quorum": escrow.threshold,
-            "key": recovered,
+            "key": sc.released_key,
             "fingerprint_match": True,
         }
 
-        # Step 2 — underwater retrieval: plan depth/current profile.
-        planner = underwater_retrieval.RetrievalPlanner()
-        retrieval = planner.plan()
+        # Step 2 — key recovery: erasure-code reconstructs the key fragments.
+        results["key_recovery"] = {
+            "data_symbols": sc.recovery_code.data_symbols,
+            "code_symbols": sc.recovery_code.code_symbols,
+            "recovered": list(sc.recovery_recovered),
+            "matches": list(sc.recovery_recovered) == list(sc.recovery_data),
+        }
+
+        # Step 3 — underwater retrieval: plan depth/current profile.
+        retrieval = sc.retrieval
         results["underwater_retrieval"] = {
-            "wreck_depth": planner.wreck_depth,
+            "wreck_depth": sc.wreck_depth,
             "total_time_s": retrieval.total_time_s,
             "surface_offset": list(retrieval.surface_offset),
             "target_reachable": retrieval.target_reachable,
         }
 
-        # Step 3 — island routing: plan the insertion route.
-        graph = island_routing.build_ionian_graph()
-        route = island_routing.plan_route(graph, "corfu", "wreck_site", risk_weight=1.0)
+        # Step 4 — island routing: plan the insertion route.
+        route = sc.route
         results["island_routing"] = {
             "path": list(route.path),
             "total_cost": route.total_cost,
@@ -210,10 +316,32 @@ class MissionProvider:  # noqa: N801 — class name fixed by the discovery contr
             "hops": route.hops,
         }
 
+        # Step 5 — targeting: fire-control intercept solution.
+        fire = sc.fire
+        results["targeting"] = {
+            "intercept_time_s": fire.intercept_time_s,
+            "lead_angle_deg": fire.lead_angle_deg,
+            "weapon_course_deg": fire.weapon_course_deg,
+            "feasible": fire.feasible,
+            "closest_approach_m": fire.closest_approach_m,
+        }
+
+        # Step 6 — acoustic link: link budget over the wreck uplink.
+        link_budget = sc.link_budget
+        results["acoustic_link"] = {
+            "range_m": _LINK_RANGE_M,
+            "received_snr_db": link_budget.received_snr_db,
+            "transmission_loss_db": link_budget.transmission_loss_db,
+            "closes": link_budget.closes,
+            "max_range_m": link_budget.max_range_m,
+        }
+
         input_hash = _input_hash(
             _SEED,
             escrow.key_fingerprint,
-            underwater_retrieval.DEFAULT_WRECK_DEPTH,
+            sc.released_key,
+            fire.intercept_time_s,
+            link_budget.received_snr_db,
             route.path,
         )
         return MissionOutcome(
