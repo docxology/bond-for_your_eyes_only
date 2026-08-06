@@ -149,3 +149,57 @@ def test_split_key_validation():
 def test_recover_key_needs_two():
     with pytest.raises(key_escrow.EscrowError):
         key_escrow.recover_key([(1, 2)])
+
+
+def test_custody_chain_for_links_the_ledger():
+    """C2: custody_chain_for builds a real, deterministic, chain-linked ledger."""
+    chain = key_escrow.custody_chain_for(("q_branch", "m", "field_agent"))
+    assert [t.index for t in chain] == [0, 1, 2]
+    assert [t.to_holder for t in chain] == ["q_branch", "m", "field_agent"]
+    assert chain[0].from_holder == ""
+    assert chain[1].from_holder == "q_branch"
+    assert chain[1].prev_hash == chain[0].chain_hash
+    assert chain[2].prev_hash == chain[1].chain_hash
+    # deterministic
+    assert key_escrow.custody_chain_for(("q_branch", "m", "field_agent")) == chain
+
+
+def test_custody_chain_is_consistent_detects_breaks():
+    chain = key_escrow.custody_chain_for(("q_branch", "m", "field_agent"))
+    assert key_escrow.custody_chain_is_consistent(chain) is True
+    # empty chain is trivially consistent
+    assert key_escrow.custody_chain_is_consistent(()) is True
+    # tampering with one record breaks the link check
+    x = key_escrow.CustodyTransfer(chain[1].index, chain[1].from_holder, "impostor", chain[1].prev_hash)
+    broken = (chain[0], x, chain[2])
+    assert key_escrow.custody_chain_is_consistent(broken) is False
+    # a renumbered index breaks it
+    reindexed = key_escrow.CustodyTransfer(
+        chain[1].index + 10,
+        chain[1].from_holder,
+        chain[1].to_holder,
+        chain[1].prev_hash,
+        chain[1].chain_hash,
+    )
+    assert key_escrow.custody_chain_is_consistent((chain[0], reindexed)) is False
+    # a record whose prev_hash does not chain breaks it
+    unlinked = key_escrow.CustodyTransfer(1, "q_branch", "m", "deadbeef")
+    assert key_escrow.custody_chain_is_consistent((chain[0], unlinked, chain[2])) is False
+
+
+def test_create_escrow_can_carry_a_custody_chain():
+    labels = ("q_branch", "m", "field_agent")
+    chain = key_escrow.custody_chain_for(labels)
+    escrow = key_escrow.create_escrow(
+        4242,
+        threshold=2,
+        num_shares=3,
+        custodian_labels=labels,
+        seed=7,
+        custody_chain=chain,
+    )
+    assert escrow.custody_chain == chain
+    assert key_escrow.custody_chain_is_consistent(escrow.custody_chain) is True
+    # and a default escrow still releases identically (chain is not required)
+    plain = key_escrow.create_escrow(4242, threshold=2, num_shares=3, custodian_labels=labels, seed=7)
+    assert key_escrow.release_key(plain, (0, 1)) == 4242

@@ -7,9 +7,11 @@ by `src/for_your_eyes_only/manuscript_variables.py`. The canonical escrow uses
 threshold {{RESULT_ESCROW_THRESHOLD}} of {{RESULT_ESCROW_SHARES}} shares; the
 key is further erasure-coded as {{RESULT_RECOVERY_DATA_SYMBOLS}} data symbols
 into {{RESULT_RECOVERY_CODE_SYMBOLS}} fragments. The underwater profile targets
-a wreck depth of {{RESULT_WRECK_DEPTH}} m, routing spans the Ionian island
-graph to the wreck site (route {{RESULT_ROUTE}}), and the acoustic uplink runs
-at {{RESULT_LINK_RANGE_M}} m.
+a wreck depth of {{RESULT_WRECK_DEPTH}} m with a {{RESULT_DIVE_BOTTOM_S}}-s
+bottom exposure under a calm horizontal current, decompressed through
+{{RESULT_DIVE_STOPS}} tissue-sized stops; routing spans the Ionian island graph
+to the wreck site (route {{RESULT_ROUTE}}); and the acoustic uplink runs at
+{{RESULT_LINK_RANGE_M}} m.
 
 ## Software environment
 

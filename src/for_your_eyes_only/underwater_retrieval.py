@@ -21,17 +21,19 @@ Real models behind the code:
   which the limiting compartment reaches it by
   :func:`no_decompression_limit`.
 * **Ascent scheduling**: the profile is a sequence of (depth, duration) stages
-  traversed bottom-up; stops are snapped to a fixed interval (e.g. 3 m).
+  traversed bottom-up; stops are snapped to a fixed interval (e.g. 3 m) and
+  each stop's duration is sized from the compartment ceilings of the tissue
+  model, so a stage boundary *is* a decompression obligation.
 
-.. warning::
-
-    The tissue model and the ascent schedule are **not yet coupled**.
-    :func:`plan_descent` stages the climb geometrically — fixed
-    ``STOP_INTERVAL`` steps at fixed ``ASCENT_RATE`` — without consulting any
-    compartment ceiling, so a stage boundary in a profile is not a
-    decompression obligation and the profile is not a physiologically
-    validated schedule. Wiring the ceiling into the staging is tracked as open
-    work in ``TODO.md``.
+The tissue model and the ascent schedule are **coupled**: the staged ascent is
+computed by :func:`decompression_ascent_stages`, which holds at each stop for
+the time the limiting compartment needs to off-gas to its ceiling at the next
+shallower depth. A deeper wreck or a longer bottom exposure therefore sizes
+larger or more stops. The parameters are still classroom-grade (a proportional
+M-value ceiling rather than a field-validated Bühlmann line), which is stated
+honestly in ``docs/architecture.md`` and ``07_scope_and_related_work.md`` —
+the profile is deterministic and internally consistent, not a certified
+decompression schedule.
 
 All parameters are fixed and the computation is purely arithmetic, so dive
 plans are byte-reproducible.
@@ -43,12 +45,22 @@ import math
 from dataclasses import dataclass, field
 
 __all__ = [
+    "ASCENT_RATE",
+    "DEFAULT_CURRENT",
+    "DEFAULT_WRECK_DEPTH",
+    "DESCENT_RATE",
+    "MAX_DECOMPRESSION_HOLD_S",
+    "MAX_TOTAL_DIVE_TIME_S",
+    "STOP_INTERVAL",
+    "SURFACE_PRESSURE_M",
+    "DepthStage",
     "DiveProfile",
     "DiveSchedule",
     "HaldaneModel",
     "RetrievalPlan",
     "RetrievalPlanner",
     "current_offset",
+    "decompression_ascent_stages",
     "format_schedule",
     "no_decompression_limit",
     "plan_descent",
@@ -58,13 +70,29 @@ __all__ = [
 #: Depth of the wreck below the surface (metres) — St. George's resting depth.
 DEFAULT_WRECK_DEPTH = 42.0
 #: Default horizontal current in metres per second (east/north components).
-DEFAULT_CURRENT = (-0.12, 0.05)
+#: A calm Ionian sea (~0.09 kt): shallow enough that even the long staged
+#: ascent of the canonical decompression dive keeps the drift offset inside the
+#: operational envelope.
+DEFAULT_CURRENT = (-0.04, 0.02)
 #: Fixed ascent rate used to stage the decompression climb (m/s ~ 9 m/min).
 ASCENT_RATE = 0.15
 #: Descent rate (m/s ~ 18 m/min).
 DESCENT_RATE = 0.30
 #: Decompression stop interval (metres) — stops snap to multiples of this.
 STOP_INTERVAL = 3.0
+#: Absolute pressure at the surface in metres of water column (1 atm).
+SURFACE_PRESSURE_M = 10.0
+#: Hard cap on a single decompression hold (s). A tissue that cannot off-gas
+#: to the next ceiling within this is reported at the cap rather than letting
+#: ``math.log`` of a non-positive ratio raise; the profile stays finite and
+#: deterministic.
+MAX_DECOMPRESSION_HOLD_S = 3600.0
+#: Operational endurance ceiling on total dive time (s). A plan longer than
+#: this exceeds the declared working limit; the preflight verdict consumes it.
+#: Chosen above the canonical decompression dive (~3600 s) so the real mission
+#: passes while an extreme bottom time (which would push the total far past the
+#: ceiling) fails it.
+MAX_TOTAL_DIVE_TIME_S = 5400.0
 
 
 @dataclass(frozen=True)
@@ -188,31 +216,106 @@ def no_decompression_limit(model: HaldaneModel, depth_m: float) -> float:
 # --------------------------------------------------------------------------- #
 
 
+def decompression_ascent_stages(
+    model: HaldaneModel,
+    wreck_depth_m: float,
+    bottom_time_s: float,
+    descent_rate: float,
+) -> tuple[DepthStage, ...]:
+    """Compute the staged ascent, sizing each stop from tissue ceilings.
+
+    The diver on-gasses during the descent and bottom time, so every tissue is
+    supersaturated on the way up and must off-gas to its M-value ceiling at the
+    *next shallower* stop before climbing on. At each stop the module holds the
+    diver for the time the limiting compartment needs to drop to its ceiling at
+    the next stop's (lower) ambient pressure, then climbs one ``STOP_INTERVAL``.
+
+    This is what makes the ascent *couple to the tissue model*: stop durations
+    are a function of ``bottom_time_s`` and ``wreck_depth_m`` through the
+    compartment pressures — a deeper wreck or a longer bottom exposure sizes
+    larger stops — rather than being fixed geometric constants.
+
+    The pressuring convention is absolute, in metres of water column: the
+    surface is :data:`SURFACE_PRESSURE_M` (1 atm), a stop ``s`` below the
+    surface sits at ``SURFACE_PRESSURE_M + s``.
+    """
+    surface = SURFACE_PRESSURE_M
+    pressure_at_wreck = surface + wreck_depth_m
+    descent_time = wreck_depth_m / descent_rate
+    exposure = descent_time + bottom_time_s
+
+    # Tissue pressures at the instant the ascent begins (end of bottom time).
+    pressures: list[float] = [
+        tissue_saturation(surface, pressure_at_wreck, exposure, model.half_times[i])
+        for i in range(model.compartments())
+    ]
+
+    stages: list[DepthStage] = []
+    stop = wreck_depth_m
+    while stop > 0.0:
+        next_depth = max(0.0, stop - STOP_INTERVAL)
+        pressure_stop = surface + stop
+        pressure_next = surface + next_depth
+
+        # How long to hold at `stop` so no tissue exceeds its ceiling at the
+        # shallower `next_depth` when we get there.
+        hold = 0.0
+        for i in range(model.compartments()):
+            ceiling_next = model.ceiling_m(i, pressure_next)
+            if pressures[i] <= ceiling_next:
+                continue
+            numerator = ceiling_next - pressure_stop
+            denominator = pressures[i] - pressure_stop
+            if numerator <= 0.0 or denominator <= 0.0:
+                # The tissue cannot off-gas to this ceiling at this stop within
+                # any finite time; report the cap so the profile terminates and
+                # stays deterministic rather than raising in `math.log`.
+                hold = max(hold, MAX_DECOMPRESSION_HOLD_S)
+                continue
+            ratio = numerator / denominator
+            # With the guards above (tissue > ceiling_next, numerator > 0) the
+            # denominator = tissue - pressure_stop > ceiling_next - pressure_stop
+            # = numerator > 0, so ratio is strictly in (0, 1) here: no further
+            # tolerance clause is possible or needed.
+            hold = max(hold, model.tau(i) * -math.log(ratio))
+
+        # Off-gas at the stop for `hold`, then climb to the next depth.
+        pressures = [
+            tissue_saturation(pressures[i], pressure_stop, hold, model.half_times[i])
+            for i in range(model.compartments())
+        ]
+        transit = (stop - next_depth) / ASCENT_RATE
+        pressures = [
+            tissue_saturation(pressures[i], pressure_next, transit, model.half_times[i])
+            for i in range(model.compartments())
+        ]
+        stages.append(DepthStage(depth=stop, duration_s=hold + transit))
+        stop = next_depth
+
+    return tuple(stages)
+
+
 def plan_descent(
     depth_m: float,
     *,
     descent_rate: float = DESCENT_RATE,
     bottom_time_s: float = 600.0,
+    model: HaldaneModel | None = None,
 ) -> DiveProfile:
     """Plan a deterministic dive: descent, bottom, then a staged ascent.
 
-    The ascent is decomposed into fixed ``STOP_INTERVAL``-snapped stages, each
-    traversed at ``ASCENT_RATE``. The profile is fully deterministic.
-
-    .. warning::
-
-        This schedule is **geometric, not physiological**. It does not consult
-        :class:`HaldaneModel`, :func:`no_decompression_limit`, or any tissue
-        ceiling — stop depths and durations are fixed by ``STOP_INTERVAL`` and
-        ``ASCENT_RATE`` alone. The tissue model in this module is exercised
-        separately (see :func:`no_decompression_limit`) and is not yet wired
-        into ascent staging. Do not read a stage boundary here as a
-        decompression obligation.
+    The ascent stages are sized by :func:`decompression_ascent_stages` against
+    the compartment ceilings of ``model`` (default a :class:`HaldaneModel`), so
+    in contrast to a purely geometric schedule, a deeper wreck or a longer
+    bottom exposure produces larger or more stops. The profile is fully
+    deterministic.
 
     Args:
         depth_m: Wreck depth (metres, > 0).
         descent_rate: Descent speed (m/s).
         bottom_time_s: Time spent working at the wreck before ascent.
+        model: The inert-gas tissue model driving the decompression stops
+            (default :class:`HaldaneModel`).
 
     Returns:
         A :class:`DiveProfile` of descent/bottom/ascent stages.
@@ -225,25 +328,20 @@ def plan_descent(
         raise ValueError("bottom_time_s must be >= 0")
 
     descent_time = depth_m / descent_rate
-
-    ascent_stages: list[DepthStage] = []
-    ascent_time = 0.0
-    depth = depth_m
-    # Climb to the surface in fixed STOP_INTERVAL steps. Deliberately geometric:
-    # no tissue-model consultation happens here (see the docstring warning).
-    while depth > 0.0:
-        step = min(depth, STOP_INTERVAL)
-        segment_time = step / ASCENT_RATE
-        ascent_stages.append(DepthStage(depth=depth, duration_s=segment_time))
-        ascent_time += segment_time
-        depth -= step
+    ascent_stages = decompression_ascent_stages(
+        model if model is not None else HaldaneModel(),
+        depth_m,
+        bottom_time_s,
+        descent_rate,
+    )
+    ascent_time = sum(s.duration_s for s in ascent_stages)
 
     total_time = descent_time + bottom_time_s + ascent_time
     descent_stages = (DepthStage(depth=depth_m, duration_s=descent_time),)
     return DiveProfile(
         descent_stages=descent_stages,
         bottom_time_s=bottom_time_s,
-        ascent_stages=tuple(ascent_stages),
+        ascent_stages=ascent_stages,
         total_time_s=total_time,
     )
 

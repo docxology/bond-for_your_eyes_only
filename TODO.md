@@ -228,3 +228,107 @@ restriction, not a package failure — re-run the same command unsandboxed.
 
 A gate you did not run is not a gate that passed. Report the coverage
 percentage and test count you actually observed, plus the commit SHA.
+
+---
+
+## Round-2 (2026-08-06)
+
+Hostile-review + deep-improvement pass. Verified this session at the commit
+noted at the top (`git log` is current): `uv run pytest tests/ --cov=src
+--cov-fail-under=90` → **188 passed, 0 failed, 0 skipped, 100.00% line+branch
+coverage** across all nine modules (Python 3.14.6, pytest 9.0.2); `ruff check`
+clean; `ruff format --check` clean (35 files); `mypy src/ scripts/` clean;
+`scripts/00_preflight.py` → 8 `[PASS]` verdicts, exit 0.
+
+### Closed from "Open work"
+
+**C1 — `closed_loop` removed.** The property was `return self.feasible` — a
+claim to a closed-loop guidance regime this package does not model, duplicating
+`feasible` under a second name. Deleted along with the two assertions that
+"covered" it (`tests/test_targeting.py`) and the `docs/architecture.md` note.
+`rg -n "closed_loop"` now returns nothing. **Evidence:** `tests/test_targeting.py`
+still covers the feasible/infeasible branches directly; suite green.
+
+**C2 — custody chain is real.** `EscrowState.custody_chain` was a permanently
+empty tuple behind a documented audit trail. Added `custody_chain_for(holders)`
+(a linked, SHA-256 hash-chained ledger over the custodians) and
+`custody_chain_is_consistent(chain)` (recomputes every link), threaded a
+`custody_chain` parameter through `create_escrow`, and bound a real chain to
+`_ATAN_ESCROW` in `mission.py`. `CanonicalMission` now carries the chain, its
+recomputed consistency, and the tip hash; `execute()` and the manuscript report
+them (`RESULT_CUSTODY_LEN/TIP/OK`, plus a `[PASS] custody_chain` preflight
+verdict). **Evidence:**
+`tests/test_key_escrow.py::test_custody_chain_for_links_the_ledger`,
+`::test_custody_chain_is_consistent_detects_breaks`,
+`::test_create_escrow_can_carry_a_custody_chain`;
+`tests/test_mission.py::test_canonical_custody_chain_is_real_and_consistent`
+(this verifies the escrow the mission operates on actually carries a non-empty,
+consistent 3-record ledger with a 64-hex tip).
+
+**V1 — `finite_dive_time` can fail.** The verdict was `plan.total_time_s > 0`,
+true for every constructible planner and therefore not a check. It now asserts
+`0 < total_time_s <= MAX_TOTAL_DIVE_TIME_S` (a declared operational endurance
+ceiling, `underwater_retrieval.py`), and the preflight reads the dive bottom
+time through a deterministic environment seam
+(`ATAC_PREFLIGHT_BOTTOM_TIME_S`, mirroring `SOURCE_DATE_EPOCH`) so a real
+subprocess can drive it red without mocks. **Evidence:**
+`tests/test_scripts_smoke.py::test_preflight_dive_verdict_can_fail` runs
+`00_preflight.py` with `ATAC_PREFLIGHT_BOTTOM_TIME_S=100000` and asserts a
+non-zero exit plus `[FAIL] finite_dive_time` in stdout; `test_preflight_all_pass`
+still exits 0 with the 8-verdict set.
+
+**D1 — the ambient-noise term is honest.** `acoustic_link.noise_level` claimed a
+"~55-75 dB" physical range with no source. The docstring now states plainly that
+$55+12\log_{10}(1+\text{sea state})$ is an **illustrative monotone stand-in**,
+not a published curve or a reproduction of Wenz's spectra; added
+`wenz1962noise` to `references.bib`, cited it in `02_methodology.md` and listed
+it in `99_references.md` and the `SYNTAX.md` key list (all kept in sync by
+`tests/test_manuscript_crossrefs.py`). **Evidence:** crossrefs suite green, and
+`rg -n "55-75 dB"` returns nothing.
+
+### Extension landed
+
+**E1 — ascent staging is now tissue-driven.** `plan_descent` no longer stages a
+geometric climb; it calls `decompression_ascent_stages`, which holds at each
+`STOP_INTERVAL`-snapped stop for the time the limiting compartment needs to
+off-gas to its M-value ceiling at the next shallower stop. Deeper wreck → more
+stops; longer bottom / slower tissue → longer stops. `RetrievalPlanner` passes a
+default `HaldaneModel`. The default current was relaxed to a calm-sea value
+(`DEFAULT_CURRENT = (-0.04, 0.02)`) so the canonical 42 m / 600 s
+decompression dive keeps its drift offset inside the 200 m reach envelope.
+The old "geometric, not coupled" warnings in the module docstring,
+`docs/architecture.md`, and `02_methodology.md` were replaced with the coupled
+description, and the scope/related-work limitations were updated to state the
+classroom-grade boundary. **Evidence:**
+`tests/test_underwater_retrieval.py::test_decompression_staging_deeper_wreck_more_stops`,
+`::test_decompression_staging_longer_bottom_larger_stops`,
+`::test_decompression_staging_slow_tissues_lengthen_ascent`,
+`::test_decompression_cap_keeps_profile_finite_for_infeasible_tissue`;
+`tests/test_figures.py::test_dive_profile_series_traces_the_staged_ascent`
+was updated (the plotted stage slope is now $\le$ `ASCENT_RATE`, flattened by
+holds, never faster). New manuscript tokens `RESULT_DIVE_BOTTOM_S`,
+`RESULT_DIVE_STOPS`, `RESULT_DIVE_ASCENT_S` drive a results table in
+`03_results.md`.
+
+### New findings fixed
+
+- **A\* admissibility is now pinned across every node pair** — a latent hazard
+  if a future graph edit made any stated edge shorter than its coordinate
+  distance (the heuristic would overestimate and A\* would silently return a
+  sub-optimal path). `tests/test_island_routing.py::test_astar_admissible_across_every_pair`
+  asserts A\* == Dijkstra for every ordered pair.
+- **`AcousticLink` accepted non-finite knobs** (NaN/inf would flow silently
+  through Thorp absorption and the bisection into plausible-looking garbage).
+  `__post_init__` now rejects non-finite fields, and `max_link_range` rejects a
+  degenerate/inverted bracket (`0 < lo < hi`). `tests/test_acoustic_link.py`
+  covers both. A logically dead `ratio >= 1.0` clause in the new ascent solver
+  was removed (nothing can reach it).
+
+### Left for a future round
+
+- `plan_descent` couples to the tissue model but still uses proportional
+  M-value ceilings; a field-validated Bühlmann-style M-line (as a tested,
+  documented model variant) would strengthen it — currently a stated classroom
+  boundary, not a live defect.
+- E2/E3 (persist provenance through `bond-utilities`, confirm the coordinator's
+  reconcile step) are unchanged and still belong to whoever runs the fleet.

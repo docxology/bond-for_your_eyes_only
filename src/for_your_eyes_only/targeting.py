@@ -59,11 +59,6 @@ class FireControlSolution:
     closest_approach_m: float
     closest_approach_time_s: float
 
-    @property
-    def closed_loop(self) -> bool:
-        """True when the weapon can actually close to intercept (``feasible``)."""
-        return self.feasible
-
 
 def normalise_course(deg: float) -> float:
     """Wrap a compass course/bearing into [0, 360) degrees (deterministic)."""

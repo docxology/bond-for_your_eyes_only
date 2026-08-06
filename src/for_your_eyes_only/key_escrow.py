@@ -42,7 +42,9 @@ __all__ = [
     "EscrowState",
     "commit_share",
     "create_escrow",
+    "custody_chain_for",
     "custody_chain_hash",
+    "custody_chain_is_consistent",
     "generate_custody_transfer",
     "mod_inverse",
     "recover_key",
@@ -278,6 +280,47 @@ def generate_custody_transfer(
     )
 
 
+def custody_chain_for(holders: Sequence[str]) -> tuple[CustodyTransfer, ...]:
+    """Build a deterministic SHA-256 hash-chained custody ledger over ``holders``.
+
+    The first transfer is the genesis record (``from_holder == ""``), and every
+    subsequent transfer chains to the previous one via its ``chain_hash``, so
+    the ledger is append-only: a handoff cannot be inserted, removed, or edited
+    without breaking every later link. Returns an empty tuple for an empty
+    ``holders`` sequence.
+    """
+    chain: list[CustodyTransfer] = []
+    prev_hash = ""
+    for index, holder in enumerate(holders):
+        from_holder = "" if index == 0 else holders[index - 1]
+        transfer = generate_custody_transfer(index, from_holder, holder, prev_hash)
+        chain.append(transfer)
+        prev_hash = transfer.chain_hash
+    return tuple(chain)
+
+
+def custody_chain_is_consistent(chain: Sequence[CustodyTransfer]) -> bool:
+    """Return whether ``chain`` is a well-formed linked custody ledger.
+
+    Every transfer must be a consecutive index starting at 0, carry a non-empty
+    ``chain_hash`` that recomputes from its own ``(prev_hash, index,
+    from_holder, to_holder)``, and chain to the record before it. This is the
+    derivable property a custody-audit verdict checks.
+    """
+    prev_hash = ""
+    for index, transfer in enumerate(chain):
+        if transfer.index != index:
+            return False
+        if transfer.prev_hash != prev_hash:
+            return False
+        if transfer.chain_hash != custody_chain_hash(
+            transfer.prev_hash, transfer.index, transfer.from_holder, transfer.to_holder
+        ):
+            return False
+        prev_hash = transfer.chain_hash
+    return True
+
+
 # --------------------------------------------------------------------------- #
 # High-level escrow
 # --------------------------------------------------------------------------- #
@@ -291,6 +334,7 @@ def create_escrow(
     custodian_labels: Sequence[str],
     seed: int = 0,
     prime: int = PRIME,
+    custody_chain: Sequence[CustodyTransfer] = (),
 ) -> EscrowState:
     """Create a deterministic escrow for ``key`` under a quorum rule.
 
@@ -301,9 +345,12 @@ def create_escrow(
         custodian_labels: Named custodians (``num_shares`` of them).
         seed: Fixed RNG seed.
         prime: Field modulus.
+        custody_chain: The SHA-256 hash-chained handoff ledger the escrow
+            carries (see :func:`custody_chain_for`); empty by default.
 
     Returns:
-        An :class:`EscrowState` binding fingerprint, shares, and commitments.
+        An :class:`EscrowState` binding fingerprint, shares, commitments, and
+        the custody chain.
     """
     if len(custodian_labels) != num_shares:
         raise EscrowError(f"need {num_shares} custodian labels, got {len(custodian_labels)}")
@@ -318,6 +365,7 @@ def create_escrow(
         shares=shares,
         commitments=commitments,
         custodian_labels=tuple(custodian_labels),
+        custody_chain=tuple(custody_chain),
     )
 
 

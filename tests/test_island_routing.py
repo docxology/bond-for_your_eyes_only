@@ -35,6 +35,27 @@ def test_plan_route_astar_equals_dijkstra():
     assert a.total_cost == pytest.approx(d.total_cost)
 
 
+def test_astar_admissible_across_every_pair():
+    """A* never overestimates: it must match Dijkstra's optimum for all 28 pairs.
+
+    The straight-line heuristic is only admissible while every stated edge
+    distance is at least the coordinate distance between its endpoints. If a
+    future graph edit ever violated that, A* could silently return a
+    sub-optimal path while still connecting the nodes. Pinning the agreement
+    for every ordered pair makes an inadmissible heuristic a test failure, not
+    a silent wrong answer.
+    """
+    graph = ir.build_ionian_graph()
+    for origin in sorted(graph.nodes):
+        for destination in sorted(graph.nodes):
+            if origin == destination:
+                continue
+            astar = ir.plan_route(graph, origin, destination, risk_weight=1.0, use_astar=True)
+            dijkstra = ir.plan_route(graph, origin, destination, risk_weight=1.0, use_astar=False)
+            assert astar.path == dijkstra.path, f"{origin}->{destination} differs"
+            assert astar.total_cost == pytest.approx(dijkstra.total_cost), f"{origin}->{destination} cost differs"
+
+
 def _two_option_graph() -> ir.IslandGraph:
     """A graph with a short-risky and a long-safe corridor between the same ends.
 

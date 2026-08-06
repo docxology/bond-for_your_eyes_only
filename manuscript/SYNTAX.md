@@ -79,7 +79,8 @@ A reference you cannot verify should be removed, not shipped.
 
 Current keys: `shamir1979share`, `reed1960polynomial`, `boycott1908prevention`,
 `dijkstra1959note`, `hart1968formal`, `thorp1967analytic`, `urick1983principles`,
-`buhlmann1984decompression`, `berlekamp1968algebraic`, `blakley1979safeguarding`.
+`buhlmann1984decompression`, `berlekamp1968algebraic`, `blakley1979safeguarding`,
+`wenz1962noise`.
 
 ## Section order
 

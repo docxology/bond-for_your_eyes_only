@@ -36,3 +36,14 @@ the declared mission configuration is pinned to the constants the mission
 executes with. None of this changes what the software computes — it changes
 whether a wrong answer would be visible, which is the property the rest of the
 report depends on.
+
+A second deepening pass applied the same discipline to three remaining hollow
+claims: the ascent staging now sizes each decompression stop from the tissue
+model's compartment ceilings (the reported profile is a genuine decompression
+obligation, not a geometric sketch); the escrow's custody chain is now carried
+by the mission as a real SHA-256 hash-chained ledger whose consistency is
+recomputed rather than assumed; and the preflight dive verdict now has an
+endurance ceiling it can actually fail on, exercised through a deterministic
+environment seam. As before, each binds a claim to a derived value that a test
+must hold true — a deeper wreck, a longer bottom, or a broken custody link now
+moves the reported numbers rather than silently restating an intention.

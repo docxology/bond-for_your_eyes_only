@@ -35,7 +35,13 @@ mission-planning software, not a training simulator.
 ## Limitations
 
 The graph topology and positions are stylised (nominal nautical-mile grid, not
-survey-grade chart data). The decompression and absorption models are classroom
-simplifications and are not certified for live operations. These
+survey-grade chart data). The decompression staging couples to the tissue model
+but uses classroom-grade proportional M-value ceilings rather than a
+field-validated Bühlmann line, and the acoustic ambient-noise term is a smooth
+monotone stand-in for sea-state noise, not a reproduction of Wenz's spectra;
+neither is certified for live operations. The custody chain models a nominal
+sequence of handoffs over the escrow's custodians — the audit *mechanism* is
+real (SHA-256 hash chaining, recomputed consistency), but the handoffs
+themselves are scenario fiction, not a recorded operational trail. These
 simplifications keep the mission fully deterministic and testable while
 preserving the mathematical substance of each concept.

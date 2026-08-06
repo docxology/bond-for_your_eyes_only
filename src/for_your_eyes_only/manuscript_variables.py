@@ -59,6 +59,12 @@ def _compute_mission_metrics() -> dict[str, str]:
         # escrow's, never stapled: a literal here would render "True" in the
         # manuscript even if release started handing back the wrong key.
         "RESULT_RECOVERED_MATCH": str(sc.fingerprint_match),
+        # Custody chain: the audit trail the escrow advertises is actually
+        # carried by it, and its well-formedness is recomputed rather than
+        # asserted so a broken ledger renders False instead of a stale tip.
+        "RESULT_CUSTODY_LEN": str(len(sc.custody_chain)),
+        "RESULT_CUSTODY_TIP": sc.custody_tip,
+        "RESULT_CUSTODY_OK": str(sc.custody_chain_ok),
         # Erasure-coded key recovery.
         "RESULT_RECOVERY_DATA_SYMBOLS": str(sc.recovery_code.data_symbols),
         "RESULT_RECOVERY_CODE_SYMBOLS": str(sc.recovery_code.code_symbols),
@@ -66,6 +72,9 @@ def _compute_mission_metrics() -> dict[str, str]:
         # Underwater retrieval.
         "RESULT_WRECK_DEPTH": f"{sc.wreck_depth:g}",
         "RESULT_DIVE_TOTAL_S": f"{sc.retrieval.total_time_s:.3f}",
+        "RESULT_DIVE_BOTTOM_S": f"{sc.retrieval.profile.bottom_time_s:g}",
+        "RESULT_DIVE_STOPS": str(len(sc.retrieval.profile.ascent_stages)),
+        "RESULT_DIVE_ASCENT_S": f"{sum(s.duration_s for s in sc.retrieval.profile.ascent_stages):.0f}",
         "RESULT_SURFACE_OFFSET_E": f"{sc.retrieval.surface_offset[0]:.3f}",
         "RESULT_SURFACE_OFFSET_N": f"{sc.retrieval.surface_offset[1]:.3f}",
         "RESULT_TARGET_REACHABLE": str(sc.retrieval.target_reachable),

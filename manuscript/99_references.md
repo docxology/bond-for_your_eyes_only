@@ -68,6 +68,12 @@ details as human-verified, not machine-verified.
 - Urick, R. J. (1983). *Principles of Underwater Sound* (3rd ed.).
   McGraw-Hill. — The sonar equation `SNR = SL − TL − NL + DI` and the detection
   threshold convention used throughout the link budget.
+- Wenz, G. M. (1962). Acoustic ambient noise in the ocean: spectra and sources.
+  *The Journal of the Acoustical Society of America*, 34(12), 1936–1956. — The
+  canonical sea-state characterisation of shallow- and deep-water ambient
+  noise. `acoustic_link.noise_level` is an *illustrative stand-in* for the same
+  growth, not a reproduction of these spectra; the citation is given so the
+  stand-in is not mistaken for a published curve.
 
 ## Fire control
 

@@ -183,3 +183,26 @@ def test_max_link_range_returns_bracket_ceiling_when_still_closing():
     """When the root lies beyond the bracket, `hi` is returned as a lower bound."""
     link = ac.AcousticLink(source_level_db=10_000.0, detection_threshold_db=0.0)
     assert ac.max_link_range(link, lo=10.0, hi=5_000.0) == 5_000.0
+
+
+def test_link_rejects_nonfinite_fields():
+    """NaN/inf must not flow silently through the budget (defensive hardening)."""
+    import math as _math
+
+    with pytest.raises(ValueError):
+        ac.AcousticLink(detection_threshold_db=_math.nan)
+    with pytest.raises(ValueError):
+        ac.AcousticLink(frequency_khz=_math.inf)
+    with pytest.raises(ValueError):
+        ac.AcousticLink(directivity_index_db=_math.nan)
+
+
+def test_max_range_rejects_degenerate_bracket():
+    """The bisection bracket must satisfy 0 < lo < hi — not silently mis-answered."""
+    link = ac.AcousticLink()
+    with pytest.raises(ValueError):
+        ac.max_link_range(link, lo=100.0, hi=10.0)
+    with pytest.raises(ValueError):
+        ac.max_link_range(link, lo=0.0, hi=10.0)
+    with pytest.raises(ValueError):
+        ac.max_link_range(link, lo=10.0, hi=10.0)

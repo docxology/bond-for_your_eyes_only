@@ -133,12 +133,16 @@ def key_fingerprint(key: int) -> str:
 
 
 #: The escrow state this mission operates on (typed; built once, immutable).
+#: The custody ledger over the custodians is bound to the escrow at creation,
+#: so the audit trail the escrow advertises is actually carried by it.
+_ATAN_CUSTODY_CHAIN: tuple[key_escrow.CustodyTransfer, ...] = key_escrow.custody_chain_for(CUSTODIANS)
 _ATAN_ESCROW: key_escrow.EscrowState = key_escrow.create_escrow(
     _atan_key(random.Random(MISSION_SEED)),
     threshold=ESCROW_THRESHOLD,
     num_shares=ESCROW_SHARES,
     custodian_labels=CUSTODIANS,
     seed=MISSION_SEED,
+    custody_chain=_ATAN_CUSTODY_CHAIN,
 )
 
 
@@ -196,6 +200,13 @@ class CanonicalMission:
     fingerprint_match: bool
     escrow_threshold: int
     escrow_num_shares: int
+    #: The custody chain bound to the escrow (the auditable handoff ledger).
+    custody_chain: tuple[key_escrow.CustodyTransfer, ...]
+    #: Whether ``custody_chain`` is a well-formed linked ledger (recomputed, not
+    #: stapled): every transfer indexes consecutive, chains to its predecessor,
+    #: and re-hashes to its own stored commitment.
+    custody_chain_ok: bool
+    custody_tip: str
     recovery_code: key_recovery.ErasureCode
     recovery_data: tuple[int, ...]
     recovery_encoded: tuple[int, ...]
@@ -231,6 +242,9 @@ def canonical_mission() -> CanonicalMission:
         fingerprint_match=key_fingerprint(escrow_key) == _ATAN_ESCROW.key_fingerprint,
         escrow_threshold=_ATAN_ESCROW.threshold,
         escrow_num_shares=_ATAN_ESCROW.num_shares,
+        custody_chain=_ATAN_ESCROW.custody_chain,
+        custody_chain_ok=key_escrow.custody_chain_is_consistent(_ATAN_ESCROW.custody_chain),
+        custody_tip=_ATAN_ESCROW.custody_chain[-1].chain_hash if _ATAN_ESCROW.custody_chain else "",
         recovery_code=recovery_code,
         recovery_data=data,
         recovery_encoded=encoded,
@@ -369,6 +383,9 @@ class MissionProvider:  # noqa: N801 — class name fixed by the discovery contr
             "quorum": escrow.threshold,
             "key": sc.released_key,
             "fingerprint_match": sc.fingerprint_match,
+            "custody_len": len(sc.custody_chain),
+            "custody_tip": sc.custody_tip,
+            "custody_chain_ok": sc.custody_chain_ok,
         }
 
         # Step 2 — key recovery: erasure-code reconstructs the key fragments.

@@ -76,6 +76,27 @@ def test_preflight_all_pass():
     assert "PASS" in proc.stdout
 
 
+def test_preflight_dive_verdict_can_fail():
+    """V1: `finite_dive_time` is a real verdict — an extreme bottom time fails it.
+
+    The verdict used to be ``total_time_s > 0``, true for every constructible
+    planner and therefore not a check at all. It now asserts the plan is within
+    the operational endurance ceiling, and the environment seam
+    ``ATAC_PREFLIGHT_BOTTOM_TIME_S`` (the established SOURCE_DATE_EPOCH-style
+    seam) lets a real, non-mocked subprocess drive it red.
+    """
+    proc = subprocess.run(
+        [sys.executable, str(PACKAGE_ROOT / "scripts" / "00_preflight.py")],
+        cwd=PACKAGE_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "ATAC_PREFLIGHT_BOTTOM_TIME_S": "100000"},
+    )
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert "[FAIL] finite_dive_time" in proc.stdout
+
+
 def test_extra_cli_args_are_ignored():
     """Only the first positional arg is the goal; trailing args do not break the CLI."""
     proc = _run_script("recon.py", "primary goal", "ignored extra")

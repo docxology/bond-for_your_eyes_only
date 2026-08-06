@@ -89,8 +89,13 @@ def transmission_loss(range_m: float, frequency_khz: float, *, spreading: float 
 def noise_level(sea_state: float = 1.0) -> float:
     """Return a deterministic ambient sea noise level (dB re 1 uPa).
 
-    A simple, smooth model of ambient noise growing with sea state (typical
-    values run ~55-75 dB for mild seas at mid frequencies).
+    The form :math:`55 + 12\\log_{10}(1 + \\mathrm{sea\\,state})` is an
+    **illustrative monotone stand-in** for the way ambient noise grows with
+    sea state — it is not a published curve, and in particular it is not a
+    reproduction of Wenz's sea-state spectra (cited as
+    ``wenz1962noise`` in ``manuscript/references.bib``). It is a smooth
+    function of the same shape used to keep the ``NL`` term of the sonar
+    equation a computed quantity with a stated sea state behind it.
 
     This is the producer of :attr:`AcousticLink.noise_level_db`: the mission's
     link is built as ``noise_level(ATAC_SEA_STATE)`` rather than carrying a
@@ -120,6 +125,19 @@ class AcousticLink:
             raise ValueError("source_level_db must be positive")
         if self.spreading <= 0:
             raise ValueError("spreading must be positive")
+        # Guard against silent NaN/inf propagation: a non-finite knob would
+        # otherwise flow through Thorp absorption, spreading loss, and the
+        # bisection into a budget that looks plausible but is garbage.
+        for field in (
+            "frequency_khz",
+            "source_level_db",
+            "noise_level_db",
+            "directivity_index_db",
+            "detection_threshold_db",
+            "spreading",
+        ):
+            if not math.isfinite(getattr(self, field)):
+                raise ValueError(f"{field} must be finite")
 
 
 @dataclass(frozen=True)
@@ -173,7 +191,12 @@ def max_link_range(link: AcousticLink, *, lo: float = 10.0, hi: float = 200_000.
       coverage the link does not have;
     * if it still closes at ``hi`` the true root lies beyond the bracket, so
       ``hi`` is returned as a lower bound on the coverage radius.
+
+    ``lo`` and ``hi`` must satisfy ``0 < lo < hi``; a degenerate or inverted
+    bracket is rejected rather than silently returning a wrong radius.
     """
+    if not (0.0 < lo < hi):
+        raise ValueError("need 0 < lo < hi for the bisection bracket")
     f_lo = received_snr(link, lo) - link.detection_threshold_db
     f_hi = received_snr(link, hi) - link.detection_threshold_db
     if f_lo < 0:

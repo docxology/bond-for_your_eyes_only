@@ -120,3 +120,65 @@ def test_format_schedule_rows():
     assert schedule.rows[0][0] == "descent"
     phases = [r[0] for r in schedule.rows]
     assert "descent" in phases and "bottom" in phases and "ascent" in phases
+
+
+def test_decompression_staging_deeper_wreck_more_stops():
+    """A deeper wreck needs more decompression stops (the schedule couples to depth)."""
+    shallow = uw.plan_descent(30.0, bottom_time_s=600.0)
+    deep = uw.plan_descent(42.0, bottom_time_s=600.0)
+    assert deep.max_depth() > shallow.max_depth()
+    assert len(deep.ascent_stages) > len(shallow.ascent_stages)
+
+
+def test_decompression_staging_longer_bottom_larger_stops():
+    """A longer bottom exposure sizes larger stops at the same stop geometry."""
+    quick = uw.plan_descent(42.0, bottom_time_s=0.0)
+    work = uw.plan_descent(42.0, bottom_time_s=600.0)
+    # identical geometry (same depth -> same stop depths), different duration
+    assert len(work.ascent_stages) == len(quick.ascent_stages)
+    quick_sum = sum(s.duration_s for s in quick.ascent_stages)
+    work_sum = sum(s.duration_s for s in work.ascent_stages)
+    assert work_sum > quick_sum
+
+
+def test_decompression_staging_slow_tissues_lengthen_ascent():
+    """Stop sizes track compartment half-times: slow tissues off-gas more slowly."""
+    fast = uw.plan_descent(42.0, bottom_time_s=600.0, model=uw.HaldaneModel(half_times=(34.0,), m_values=(2.72,)))
+    slow = uw.plan_descent(42.0, bottom_time_s=600.0, model=uw.HaldaneModel(half_times=(540.0,), m_values=(1.51,)))
+    fast_sum = sum(s.duration_s for s in fast.ascent_stages)
+    slow_sum = sum(s.duration_s for s in slow.ascent_stages)
+    assert slow_sum > fast_sum
+
+
+def test_decompression_staging_is_ceiling_respecting():
+    """The staged ascent is strictly monotone and the tissues are safe at the wreck."""
+    model = uw.HaldaneModel()
+    profile = uw.plan_descent(42.0, bottom_time_s=600.0, model=model)
+    surface = uw.SURFACE_PRESSURE_M
+    descent = profile.descent_stages[0]
+    # after descent+bottom the tissues have saturated toward the wreck pressure
+    p_wreck = surface + 42.0
+    exposure = descent.duration_s + profile.bottom_time_s
+    for i in range(model.compartments()):
+        sat = uw.tissue_saturation(surface, p_wreck, exposure, model.half_times[i])
+        assert sat <= model.ceiling_m(i, p_wreck) + 1e-6, f"tissue {i} exceeds ceiling at wreck"
+    # every stop is strictly shallower than the one before it
+    stops = [s.depth for s in profile.ascent_stages]
+    assert all(a > b for a, b in zip(stops, stops[1:]))
+
+
+def test_decompression_cap_keeps_profile_finite_for_infeasible_tissue():
+    """A tissue that can never off-gas to its (near-surface) ceiling is capped.
+
+    A compartment whose M-value is just above 1.0 sets a ceiling at shallow
+    stops that lies below the stop's own ambient pressure, so the tissue cannot
+    off-gas to it in any finite time. The scheduler must report the hard cap
+    and keep the profile finite and monotone rather than raising in ``math.log``.
+    """
+    pathological = uw.HaldaneModel(half_times=(34.0,), m_values=(1.01,))
+    profile = uw.plan_descent(42.0, bottom_time_s=0.0, model=pathological)
+    assert all(s.duration_s >= 0.0 for s in profile.ascent_stages)
+    # the cap is actually exercised: at least one stage hits the hard cap
+    assert any(s.duration_s >= uw.MAX_DECOMPRESSION_HOLD_S for s in profile.ascent_stages)
+    # and the profile stays finite (no inf/nan leaks into total time)
+    assert math.isfinite(profile.total_time_s)

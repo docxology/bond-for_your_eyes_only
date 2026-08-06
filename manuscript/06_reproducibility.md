@@ -42,16 +42,25 @@ zero skips. The measured figure is reported by that command, not by this
 sentence.
 
 The suite covers, per module: escrow split/recover round-trips, commitment
-verification, quorum rejection and tamper rejection; erasure encode/recover
-round-trips, exhaustive any-`k` recovery over every surviving-fragment
-combination, and checksum corruption detection; underwater descent/ascent
-scheduling, drift compensation, and reachability edges; routing optimality,
-Dijkstra/A* agreement, risk sensitivity, disconnected-graph and unknown-node
-errors; fire-control intercept feasibility, lead-angle geometry, and the
+verification, quorum rejection and tamper rejection, and custody-chain linking
+and integrity-breaking detection; erasure encode/recover round-trips,
+exhaustive any-`k` recovery over every surviving-fragment combination, and
+checksum corruption detection; underwater descent/ascent scheduling — including
+the tissue-driven decompression staging, whose stop sizes are pinned to depth,
+bottom time, and compartment half-times — drift compensation, and reachability
+edges; routing optimality, Dijkstra/A* agreement pinned across every ordered
+node pair, risk sensitivity, disconnected-graph and unknown-node errors;
+fire-control intercept feasibility, lead-angle geometry, and the
 closest-approach fallback on both the equal-speed and negative-discriminant
 branches; and acoustic-link path loss, the geometric spreading exponent pinned
-against its textbook law, SNR monotonicity, bisection closure, and the
-non-closing case.
+against its textbook law, SNR monotonicity, bisection closure, the
+non-closing case, and rejection of non-finite knobs and degenerate brackets.
+
+The preflight's two derived verdicts — the custody chain and the dive's
+endurance ceiling — are both testable as failures: the custody verdict through a
+tampered ledger, and the dive verdict through the deterministic
+`ATAC_PREFLIGHT_BOTTOM_TIME_S` seam that drives `00_preflight.py` to a non-zero
+exit.
 
 Routing note: the suite pins the *cost* blend and, on a purpose-built
 two-option graph, the risk term's ability to select a different path. On the

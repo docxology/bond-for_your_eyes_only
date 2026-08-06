@@ -10,14 +10,18 @@ implemented as a pure, infrastructure-free domain module:
 1. **Key escrow** — the ATAC key is split among {{RESULT_ESCROW_SHARES}}
    custodians using Shamir secret sharing, with a quorum of
    {{RESULT_ESCROW_THRESHOLD}} required to release it (key
-   {{RESULT_ESCROW_KEY}}; match {{RESULT_RECOVERED_MATCH}}).
+   {{RESULT_ESCROW_KEY}}; match {{RESULT_RECOVERED_MATCH}}), and custody is
+   carried as an audited {{RESULT_CUSTODY_LEN}}-record hash-chained ledger
+   ({{RESULT_CUSTODY_OK}}).
 2. **Erasure-coded key recovery** — {{RESULT_RECOVERY_DATA_SYMBOLS}} data
    symbols encoded into {{RESULT_RECOVERY_CODE_SYMBOLS}} code fragments so any
    quorum recovery survives loss/corruption (match
    {{RESULT_RECOVERY_MATCH}}).
-3. **Underwater retrieval planning** — a Haldane-style staged dive to
-   ({{RESULT_SURFACE_OFFSET_E}}, {{RESULT_SURFACE_OFFSET_N}}) m drift offset
-   over {{RESULT_DIVE_TOTAL_S}} s to reach the {{RESULT_WRECK_DEPTH}}-m wreck
+3. **Underwater retrieval planning** — a Haldane-style staged dive of
+   {{RESULT_DIVE_TOTAL_S}} s to the {{RESULT_WRECK_DEPTH}}-m wreck: a
+   {{RESULT_DIVE_BOTTOM_S}} s bottom exposure, then {{RESULT_DIVE_STOPS}}
+   tissue-sized decompression stops, against a drift offset of
+   ({{RESULT_SURFACE_OFFSET_E}}, {{RESULT_SURFACE_OFFSET_N}}) m
    (reachable: {{RESULT_TARGET_REACHABLE}}).
 4. **Greek-island insertion routing** — a least-cost route
    ({{RESULT_ROUTE}}, {{RESULT_ROUTE_DISTANCE}} nm).

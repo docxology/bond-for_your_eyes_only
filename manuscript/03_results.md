@@ -3,6 +3,15 @@
 The mission was executed end to end through the frozen protocol; all results
 below are computed live by the domain modules (never hand-authored).
 
+| Stage | Result |
+|---|---|
+| Escrow release | quorum {{RESULT_ESCROW_THRESHOLD}}-of-{{RESULT_ESCROW_SHARES}} · key {{RESULT_ESCROW_KEY}} · fingerprint match {{RESULT_RECOVERED_MATCH}} · custody {{RESULT_CUSTODY_OK}} ({{RESULT_CUSTODY_LEN}}-record chain) |
+| Erasure-coded recovery | {{RESULT_RECOVERY_DATA_SYMBOLS}}-of-{{RESULT_RECOVERY_CODE_SYMBOLS}} · recovered match {{RESULT_RECOVERY_MATCH}} |
+| Underwater retrieval | {{RESULT_WRECK_DEPTH}} m · {{RESULT_DIVE_BOTTOM_S}} s bottom · {{RESULT_DIVE_STOPS}} decompression stops · {{RESULT_DIVE_TOTAL_S}} s total · surface offset ({{RESULT_SURFACE_OFFSET_E}}, {{RESULT_SURFACE_OFFSET_N}}) m · reachable {{RESULT_TARGET_REACHABLE}} |
+| Island routing | {{RESULT_ROUTE}} · {{RESULT_ROUTE_HOPS}} hops · {{RESULT_ROUTE_DISTANCE}} nm · cost {{RESULT_ROUTE_COST}} |
+| Fire control | feasible {{RESULT_FIRE_FEASIBLE}} · intercept {{RESULT_FIRE_INTERCEPT_S}} s · lead {{RESULT_FIRE_LEAD_DEG}}° · closest-approach {{RESULT_FIRE_CLOSEST_M}} m |
+| Acoustic link | SNR {{RESULT_LINK_SNR_DB}} dB at {{RESULT_LINK_RANGE_M}} m · TL {{RESULT_LINK_TL_DB}} dB · threshold {{RESULT_LINK_THRESHOLD_DB}} dB · margin {{RESULT_LINK_MARGIN_DB}} dB · max range {{RESULT_LINK_MAX_RANGE_M}} m · closes {{RESULT_LINK_CLOSES}} |
+
 ## Escrow release
 
 A quorum of {{RESULT_ESCROW_THRESHOLD}} of {{RESULT_ESCROW_SHARES}} custodians
@@ -10,6 +19,11 @@ releases the key deterministically. The reconstructed key is
 {{RESULT_ESCROW_KEY}}, confirmed to match the escrow fingerprint
 ({{RESULT_RECOVERED_MATCH}}). A smaller quorum is rejected, and a tampered
 share fails verification before release.
+
+Custody is an audited concern here, not decoration: the escrow carries a
+{{RESULT_CUSTODY_LEN}}-record SHA-256 hash-chained ledger of the handoffs, whose
+well-formedness is recomputed ({{RESULT_CUSTODY_OK}}) and whose tip hash is
+{{RESULT_CUSTODY_TIP}}.
 
 That confirmation is *re-derived*, not asserted: the SHA-256 fingerprint of the
 released key is recomputed and compared against the one the escrow stored. This
@@ -36,9 +50,12 @@ told that nothing was wrong.
 ## Underwater retrieval
 
 The retrieval dive to {{RESULT_WRECK_DEPTH}} m completes in
-{{RESULT_DIVE_TOTAL_S}} s of deterministic profile time. The surface drift
-offset is ({{RESULT_SURFACE_OFFSET_E}}, {{RESULT_SURFACE_OFFSET_N}}) m; the
-target is reachable within the operational envelope
+{{RESULT_DIVE_TOTAL_S}} s of deterministic profile time: a
+{{RESULT_DIVE_BOTTOM_S}} s bottom exposure followed by
+{{RESULT_DIVE_STOPS}} decompression stops totaling {{RESULT_DIVE_ASCENT_S}} s
+of ascent, each stop sized from the compartment ceilings (see §2). The surface
+drift offset is ({{RESULT_SURFACE_OFFSET_E}}, {{RESULT_SURFACE_OFFSET_N}}) m;
+the target is reachable within the operational envelope
 ({{RESULT_TARGET_REACHABLE}}). The depth-time profile is shown in
 Figure [@fig:dive_profile].
 

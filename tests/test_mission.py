@@ -60,6 +60,9 @@ def test_execute_produces_deterministic_results():
         "acoustic_link",
     }
     assert outcome.results["escrow_release"]["fingerprint_match"] is True
+    assert outcome.results["escrow_release"]["custody_chain_ok"] is True
+    assert outcome.results["escrow_release"]["custody_len"] == len(mission.CUSTODIANS)
+    assert len(outcome.results["escrow_release"]["custody_tip"]) == 64
     assert outcome.results["key_recovery"]["matches"] is True
     assert len(outcome.results["island_routing"]["path"]) >= 2
     assert outcome.results["underwater_retrieval"]["target_reachable"] is True
@@ -167,3 +170,27 @@ def test_releasing_gadget_escrow_recovers():
     assert key_fingerprint(key) == escrow.key_fingerprint
     assert release_key(escrow, (escrow.num_shares - 1, escrow.num_shares - 2)) == key
     assert 0 < key < escrow.prime
+
+
+def test_canonical_custody_chain_is_real_and_consistent():
+    """C2: the escrow carries a genuine handoff ledger, and it verifies.
+
+    Previously `EscrowState.custody_chain` was a permanently empty tuple behind
+    a documented audit trail. The mission now binds a custody chain built over
+    the custodians to the escrow, reports a non-empty tip, and recomputes
+    consistency rather than asserting it.
+    """
+    from for_your_eyes_only.key_escrow import custody_chain_is_consistent
+    from for_your_eyes_only.mission import canonical_mission
+
+    sc = canonical_mission()
+    assert len(sc.custody_chain) == len(mission.CUSTODIANS) >= 2
+    assert custody_chain_is_consistent(sc.custody_chain) is True
+    assert sc.custody_chain_ok is True
+    # the tip is a full SHA-256 hex digest, derived (not stapled)
+    assert len(sc.custody_tip) == 64
+    # the chain records the custodian handoffs in order
+    holders = [c.to_holder for c in sc.custody_chain]
+    assert holders == list(mission.CUSTODIANS)
+    # genesis record has no prior holder
+    assert sc.custody_chain[0].from_holder == ""

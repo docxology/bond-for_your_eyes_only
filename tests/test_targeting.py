@@ -56,7 +56,6 @@ def test_feasible_stationary_target():
     assert solution.intercept_time_s == pytest.approx(20.0, rel=1e-3)
     assert solution.lead_angle_deg == pytest.approx(0.0, abs=1e-3)
     assert solution.weapon_course_deg == pytest.approx(45.0, abs=1e-3)
-    assert solution.closed_loop is True
 
 
 def test_equal_speed_closing_intercept():
@@ -83,7 +82,6 @@ def test_equal_speed_receding_infeasible():
     )
     assert solution.feasible is False
     assert solution.intercept_time_s == math.inf
-    assert solution.closed_loop is False
 
 
 def test_infeasible_target_outruns():

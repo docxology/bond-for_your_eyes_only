@@ -87,8 +87,16 @@ def test_dive_profile_series_traces_the_staged_ascent():
     assert all(d > 0.0 for d in ascent_depths[:-1]), "ascent must not jump to the surface early"
     assert ascent_depths[-1] == 0.0
 
-    # The plotted climb rate matches the coded ASCENT_RATE on every stage.
+    # The plotted climb rate is at most the coded ASCENT_RATE: a stage climbs
+    # at exactly that rate when it carries no decompression hold, or slower
+    # when a hold flattens it — never faster. Because the 42 m / 600 s
+    # canonical dive requires decompression stops, at least one stage is
+    # slower than the coded rate, and the series must show that rather than
+    # erasing the holds.
+    rates = []
     for i in range(len(ascent_depths)):
         dt = times[3 + i] - times[2 + i]
         drop = depths[2 + i] - ascent_depths[i]
-        assert drop / dt == pytest.approx(uw.ASCENT_RATE)
+        rates.append(drop / dt)
+    assert all(0.0 < rate <= uw.ASCENT_RATE + 1e-9 for rate in rates), "ascent must never exceed the coded rate"
+    assert min(rates) < uw.ASCENT_RATE - 1e-9, "decompression holds must flatten at least one ascent stage"

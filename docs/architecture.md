@@ -42,8 +42,11 @@ Also provides:
 
 - `commit_share` / `verify_share` — a share is committed as `g^y mod p`, so a
   share tampered with during custody is rejected before it can be used.
-- `custody_chain_hash` / `generate_custody_transfer` — a SHA-256 hash-chained
-  ledger of handoffs, making custody auditable and append-only.
+- `custody_chain_hash` / `generate_custody_transfer` / `custody_chain_for` /
+  `custody_chain_is_consistent` — a SHA-256 hash-chained ledger of handoffs,
+  making custody auditable and append-only. The mission binds a real chain
+  (built over its custodians) to the escrow at creation and reports its tip,
+  rather than leaving the field empty.
 - `create_escrow` / `release_key` — the high-level API. `release_key` verifies
   each share against its commitment, reconstructs, then confirms the result
   reproduces the escrow's stored key fingerprint.
@@ -86,10 +89,15 @@ Three pieces of real physics:
   `T` under constant current `(u, v)`, the bell must start offset by `T*(u,v)`
   upstream to land on the wreck.
 
-`plan_descent` assembles a descent/bottom/staged-ascent profile snapped to a
-fixed stop interval; `RetrievalPlanner` binds depth, current, and bottom time
-into a `RetrievalPlan` and reports whether the required offset is inside the
-operational envelope.
+`plan_descent` assembles a descent/bottom/staged-ascent profile; the ascent
+stops are snapped to a fixed interval and each stop's duration is sized by
+`decompression_ascent_stages` against the compartment ceilings of a Haldane
+model, so a deeper wreck or a longer bottom exposure produces larger or more
+stops. The parameters are classroom-grade (proportional M-value ceilings, not a
+field-validated Bühlmann line), stated plainly in the module docstring and in
+`07_scope_and_related_work.md`. `RetrievalPlanner` binds depth, current, and
+bottom time into a `RetrievalPlan` and reports whether the required drift
+offset is inside the operational envelope.
 
 ### `island_routing.py` — the insertion route
 

@@ -27,7 +27,11 @@ against the commitment, so a share tampered with during custody is rejected
 before release.
 
 **Custody.** Handoffs are recorded in a SHA-256 hash-chained ledger, binding
-the whole custody history append-only.
+the whole custody history append-only. The canonical mission **carries** one: a
+ledger over the {{RESULT_ESCROW_SHARES}}-custodian chain ({{RESULT_CUSTODY_LEN}}
+records) is bound to the escrow at creation, its well-formedness recomputed
+({{RESULT_CUSTODY_OK}}) and its tip hash ({{RESULT_CUSTODY_TIP}}) reported, so
+the advertised audit trail is not an empty field.
 
 **Release.** Release reconstructs the key from a verified quorum and confirms
 it reproduces the escrow's key fingerprint. The recovered key is
@@ -81,14 +85,26 @@ first saturates to its ceiling,
 $t_i = \tau_i \ln\frac{P_{amb}-1}{P_{amb}-M_i}$, in the multi-compartment form
 of [@buhlmann1984decompression].
 
+**Staged ascent.** The ascent is decomposed into stops snapped to a fixed
+interval, and each stop's duration is sized *directly from the tissue state*:
+the diver holds at a stop for the time the limiting compartment needs to
+off-gas to its ceiling at the next (shallower) stop, then climbs at the ascent
+rate. The profile is therefore a function of the exposure itself — a deeper
+wreck produces more stops, and a longer bottom time produces longer holds —
+rather than a fixed geometric schedule. This is the difference that matters for
+the figure and the reported profile: every stage boundary is now a
+decompression obligation.
+
 We state the boundary of this model plainly, because it is easy to overread.
-The ascent is staged in **fixed-depth steps at a fixed rate**: the staging is
-geometric and does not consult the tissue state. The tissue model computes
-no-decompression limits and ceilings as an independent quantity; it does not
-size the stops. A stage boundary in the reported profile is therefore not a
-decompression obligation, and the profile should not be read as a
-physiologically validated schedule. Wiring the ceiling into the staging is
-recorded as open work rather than claimed as done.
+The staging couples to the tissue model, but the tissue parameters are
+classroom-grade — a proportional M-value ceiling ($\text{ceiling} = m_i \cdot
+P_{amb}$) rather than a field-validated Bühlmann line — so the profile is
+deterministic and internally consistent but is **not a certified decompression
+schedule**. `no_decompression_limit` remains an independent quantity the
+scheduler does not consult; the canonical dive's bottom exposure and stop count
+are reported as live results ({{RESULT_DIVE_BOTTOM_S}} s bottom,
+{{RESULT_DIVE_STOPS}} stops, {{RESULT_DIVE_ASCENT_S}} s of ascent), not fixed
+geometric constants.
 
 ## Greek-island insertion routing
 
@@ -134,8 +150,10 @@ absorption via **Thorp's formula** (dB/km) [@thorp1967analytic]. Geometric
 spreading is $10 n \log_{10} r$ for a spreading exponent $n$ — $n = 2$
 spherical, $n = 1$ cylindrical — and the wreck uplink is modelled as a
 shallow-water horizontal channel, so it uses $n = 1$. The ambient noise term NL
-is computed from a declared sea state rather than entered as a decibel literal.
-Received SNR is
+is computed from a declared sea state: the module applies a smooth, monotone
+*stand-in* for how wind-driven deep-water ambient noise grows with sea state
+— the family quantified by Wenz's spectra [@wenz1962noise] — rather than a
+reproduction of them or a hand-entered decibel literal. Received SNR is
 $\text{SNR} = \text{SL} - \text{TL} - \text{NL} + \text{DI}$
 [@urick1983principles] and the link
 *closes* when SNR exceeds the detection threshold $\text{DT}$. The **margin**
