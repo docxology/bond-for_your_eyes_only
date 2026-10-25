@@ -1,4 +1,4 @@
-# Manuscript (`projects/working/bond/for_your_eyes_only/manuscript/`)
+# Manuscript (`manuscript/` in the for_your_eyes_only package root)
 
 This directory holds the ATAC mission manuscript. Numbered prose sections
 (`NN_*.md`) may contain `{{TOKEN}}` placeholders resolved by

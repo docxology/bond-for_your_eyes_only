@@ -11,8 +11,9 @@ the files at the bond root, or the template repository. If your change appears
 to require touching a sibling, it does not belong here — record it as an
 integration point in `../TODO.md` instead.
 
-This is a **local-only** working tree. There is no remote and there never will
-be one. Commit here; never push.
+The only permitted remote is `origin`
+(`github.com/docxology/bond-for_your_eyes_only`). Commit here; push only there,
+and never to a sibling BOND package or the template repository.
 
 ## Hard invariants
 
@@ -31,7 +32,7 @@ Scripts parse arguments, wire imports, and print. The moment a script computes
 something a reader would cite, that computation belongs in a domain module with
 a test.
 
-**3. The five domain modules stay infrastructure-free.**
+**3. The six domain modules stay infrastructure-free.**
 `key_escrow`, `key_recovery`, `underwater_retrieval`, `island_routing`,
 `targeting`, and `acoustic_link` must remain importable without `bond_api`
 installed. `mission.py` is the only adapter. Do not add a suite import to a
@@ -45,9 +46,11 @@ function. `generate_variables(metrics_provider=...)` is the worked example.
 
 **5. Determinism.**
 One fixed seed (`mission.MISSION_SEED`). No wall-clock value in any persisted
-artifact — `Provenance.wall_time_s` is deliberately `0.0`, and the only
-timestamp is the explicitly injectable `GENERATION_TIMESTAMP`. Regenerating
-`output/` must reproduce it byte-for-byte.
+artifact — `Provenance.wall_time_s` is deliberately `0.0`, and the build stamp
+(`SOURCE_DATE`) is derived from tracked inputs (`SOURCE_DATE_EPOCH`, else the
+manuscript's declared `paper.date`), injectable in tests via
+`generate_variables(now=...)`. Regenerating `output/` must reproduce it
+byte-for-byte.
 
 **6. Every manuscript number is injected.**
 Never type a metric into prose. Add it to `manuscript_variables` and reference

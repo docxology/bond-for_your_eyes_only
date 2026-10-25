@@ -4,8 +4,8 @@ Concrete commands and task recipes. For the rules behind them see
 [`AGENTS.md`](AGENTS.md); for what the code does see
 [`architecture.md`](architecture.md).
 
-All commands run from the package root:
-`projects/working/bond/for_your_eyes_only/`.
+All commands run from the package root — the directory containing
+`pyproject.toml`.
 
 ## Setup
 

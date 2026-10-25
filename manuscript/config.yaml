@@ -1,7 +1,7 @@
 # For Your Eyes Only (1981) · mission codename ATAC
 # PROJECT BOND film package — manuscript metadata + mission variables source.
 # Loaded by src/for_your_eyes_only/manuscript_variables.py via yaml.safe_load.
-# Local-only tree: no remote, no DOI/deposit fields.
+# Working copy — no DOI/deposit fields.
 
 paper:
   title: "For Your Eyes Only: ATAC — Special-Agent Mission Software"

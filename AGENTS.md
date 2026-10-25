@@ -1,8 +1,10 @@
 # for_your_eyes_only — ATAC Mission Software
 
 PROJECT BOND film package for **For Your Eyes Only (1981)**, mission codename
-**ATAC**. Scope is **exactly this directory**. This is a **local-only** working
-tree: no remote, never push. All commands run from this directory.
+**ATAC**. Scope is **exactly this directory**. The only permitted remote is
+`origin` (`github.com/docxology/bond-for_your_eyes_only`) — never push to a
+sibling package or the template repository. All commands run from this
+directory.
 
 Detailed guidance lives in `docs/`:
 

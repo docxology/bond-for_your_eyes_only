@@ -159,7 +159,9 @@ Regenerating `output/` reproduces it byte-for-byte, checked by
 `tests/test_scripts_smoke.py::test_regenerating_the_artifact_tree_is_byte_identical`,
 which runs the generator twice into two roots and diffs every file.
 
-This is a **local-only** tree with no remote — never push.
+The tree is authored locally; its only remote is `origin`
+(`github.com/docxology/bond-for_your_eyes_only`). Push only there — never to a
+sibling BOND package or the template repository.
 
 ## License
 

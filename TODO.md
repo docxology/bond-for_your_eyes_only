@@ -4,11 +4,11 @@ PROJECT BOND film package for **For Your Eyes Only (1981)**, mission codename
 **ATAC**: threshold key escrow, erasure-coded key survival, Haldane dive
 planning, Ionian insertion routing, fire-control intercept, and an underwater
 acoustic link budget, all behind a frozen `bond_api.MissionProvider`. Scope is
-exactly this directory; local-only tree, no remote.
+exactly this directory.
 
-**Verified state today** (measured this session at `949bd24`, working tree
-clean): `uv run pytest tests/ --cov=src --cov-fail-under=90` → **175 passed,
-0 failed, 0 skipped, 100.00% line+branch coverage** across all nine modules in
+**Verified state at `949bd24`** (measured then, working tree clean):
+`uv run pytest tests/ --cov=src --cov-fail-under=90` → **175 passed, 0 failed,
+0 skipped, 100.00% line+branch coverage** across all nine modules in
 `src/for_your_eyes_only/` (Python 3.14.6, pytest 9.0.2). Every one of the 11
 findings in `output/verify/for_your_eyes_only.json` was re-checked against the
 current tree and is resolved; the package produced no
@@ -22,6 +22,10 @@ Completed work is not tracked here; `git log` is the record.
 ---
 
 ## Open work
+
+**Closed in Round-2:** the Round-1 items C1, C2, V1, D1, and E1 listed below
+are fixed — the Round-2 section records what each became and the tests that pin
+it. What remains open is the fleet-side integration work (E2, E3).
 
 ### Correctness
 
@@ -170,12 +174,12 @@ run the coordinator's gate, not a hand-written assertion in this package.
   not "fix" this by perturbing edge weights until the choice flips — that would
   be authoring geography to satisfy a test.
 
-- **Ascent staging is geometric, not tissue-driven.** See E1. Until E1 lands,
-  the honest scope is: the Haldane compartments, `ceiling_m`, and
-  `no_decompression_limit` are real and tested, but the ascent schedule does
-  not consult them. `manuscript/02_methodology.md`, the module docstring
-  (`underwater_retrieval.py:30`), and `plan_descent`'s docstring (`:205-208`)
-  all state this rather than implying a decompression-driven profile.
+- **Decompression staging is tissue-driven but classroom-grade.** `plan_descent`
+  sizes each stop with `decompression_ascent_stages` against proportional
+  M-value ceilings — not a field-validated Bühlmann M-line — and the schedule
+  does not consult `no_decompression_limit`. `manuscript/02_methodology.md`, the
+  module docstring (`underwater_retrieval.py:28-32`), and `plan_descent`'s
+  docstring all state that boundary rather than implying a certified model.
 
 - **`Provenance.wall_time_s` is the literal `0.0`.** It is not a measurement
   and is not meant to be one: any real timing value would make `output/`
@@ -214,7 +218,7 @@ uv run ruff check src/ scripts/ tests/          # expected: "All checks passed!"
 uv run ruff format --check src/ scripts/ tests/ # expected: no files would be reformatted
 uv run mypy src/ scripts/                       # expected: no issues
 
-uv run python scripts/00_preflight.py           # expected: 7 [PASS] lines, exit 0
+uv run python scripts/00_preflight.py           # expected: 8 [PASS] lines, exit 0
 uv run python scripts/z_generate_manuscript_variables.py  # regenerates output/, exit 0
 
 rg -n "MagicMock|unittest\.mock|mocker\.patch" tests/   # expected: no matches (no-mock policy)
