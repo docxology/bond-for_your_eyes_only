@@ -1,5 +1,5 @@
 # PROJECT BOND — for_your_eyes_only (For Your Eyes Only, 1981) · mission codename ATAC
-# Local-only BOND suite package. Depends on the frozen bond_api protocol.
+# BOND suite package. Depends on the frozen bond_api protocol.
 
 [build-system]
 requires = ["setuptools>=61.0"]
