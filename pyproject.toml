@@ -33,7 +33,7 @@ dev = [
 # Local path dependency so the frozen bond-api protocol is importable
 # (the orchestrator discovers us via bond_api; do not invent protocol types).
 [tool.uv.sources]
-bond-api = { path = "/Users/4d/Documents/GitHub/template/projects/working/bond/bond-api" }
+bond-api = { path = "../bond-api" }
 
 [tool.pytest.ini_options]
 pythonpath = [".", "src"]
