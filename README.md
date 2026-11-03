@@ -144,8 +144,10 @@ output/                   regenerable artifacts (figures, resolved manuscript) â
 
 ```toml
 [tool.uv.sources]
-bond-api = { path = "/Users/4d/Documents/GitHub/template/projects/working/bond/bond-api" }
+bond-api = { path = "../bond-api" }
 ```
+
+(It previously named an absolute path on the author's machine, which resolved only there.)
 
 The orchestrator's `load_provider("for_your_eyes_only")` discovers
 `MissionProvider` at module top level on `sys.path`.
