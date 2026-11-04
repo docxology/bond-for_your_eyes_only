@@ -28,7 +28,7 @@ uplink that carries the solution back.
 ## Build and test
 
 ```bash
-uv sync                                              # install (bond-api is a local path dep)
+uv sync --extra dev                                  # install (dev tools; bond-api is vendored)
 
 uv run pytest tests/ --cov=src --cov-fail-under=90   # tests + branch coverage, floor 90% of src/
 uv run ruff check src/ scripts/ tests/               # lint

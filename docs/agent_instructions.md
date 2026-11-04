@@ -10,13 +10,14 @@ All commands run from the package root — the directory containing
 ## Setup
 
 ```bash
-uv sync
+uv sync --extra dev
 ```
 
 `bond-api` is a local path dependency declared in `pyproject.toml` under
-`[tool.uv.sources]`. If it fails to resolve, the sibling `bond-api` package is
-missing from the expected location — that is an environment problem, not a code
-problem, and the six domain modules still import and test without it.
+`[tool.uv.sources]`, pointing at the vendored copy in `vendor/bond-api`. If it
+fails to resolve, the copy is missing or edited — `uv run python
+scripts/vendor.py --check` says which — and that is a tree problem, not a code
+problem; the six domain modules still import and test without it.
 
 ## The gates
 
