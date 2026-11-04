@@ -86,6 +86,27 @@ configuration that makes `00_preflight.py` exit non-zero on exactly that line.
 asserting a non-zero exit with `[FAIL] finite_dive_time` in stdout, alongside
 the existing `test_preflight_all_pass`.
 
+**V2 — the documented lint gate is red on the shipped tree.**
+Measured 2026-11-04 on a clean copy of this head, with the lock's own ruff
+(0.16.1) in an environment built by `uv sync --extra dev`: `uv run ruff check
+src/ scripts/ tests/` → **29 findings in 15 files** (10 RUF100, 5 UP017, 5 I001,
+3 UP035, 2 TRY004, one each C408, RUF007, RUF022, RUF059; 24 fixable, 3 more
+behind `--unsafe-fixes`), and `uv run ruff format --check src/ scripts/ tests/`
+→ **22 files would be reformatted, 17 already formatted**. `uv run mypy src/
+scripts/` is clean. Both commands report the same 29 findings and the same 22
+files before and after the vendoring change on this branch — normalized and
+compared element by element, so every file named here is a file both runs named
+— and the debt is recorded rather than folded into that change. The block below
+used to promise the opposite output for both commands; the promise is the
+target, not a measurement.
+*Done when:* `ruff check --fix` (24) plus the five it will not touch are fixed
+and a `ruff format` pass leaves both commands printing the target output — with
+no rule suppressed, no file added to an ignore list, and no `noqa` added to
+reach it.
+*Demonstrate:* `uv run ruff check src/ scripts/ tests/` prints "All checks
+passed!" and `uv run ruff format --check src/ scripts/ tests/` reports zero
+files to reformat.
+
 ### Documentation
 
 **D1 — the ambient-noise model is the one channel term with no source.**
@@ -208,15 +229,25 @@ run the coordinator's gate, not a hand-written assertion in this package.
 
 ## Verification
 
-Run from this directory. All must be green before any commit.
+Run from this directory. All must be green before any commit. The two `ruff`
+lines are the exception at this head: they are red, with the debt and its fix
+shape recorded as V2. A change that adds a finding or an unformatted file to
+either list is not green by this block.
 
 ```bash
-uv run pytest tests/ --cov=src --cov-fail-under=90
-# expected: 175 passed, 0 skipped; "Total coverage: 100.00%" (floor 90%, branch on)
+uv sync --extra dev                              # dev tools; bond-api is vendored
 
-uv run ruff check src/ scripts/ tests/          # expected: "All checks passed!"
-uv run ruff format --check src/ scripts/ tests/ # expected: no files would be reformatted
-uv run mypy src/ scripts/                       # expected: no issues
+uv run pytest tests/ --cov=src --cov-fail-under=90
+# measured 2026-11-04: 189 passed, 0 skipped; "Total coverage: 100.00%" (floor 90%,
+# branch on). The count moves as tests are added — 175 at `949bd24`, 188 before the
+# vendoring change, 189 after it; zero failures, zero skips and 100.00% do not move.
+
+uv run ruff check src/ scripts/ tests/          # target: "All checks passed!"
+                                                # measured 2026-11-04: 29 findings in 15
+                                                # files — see V2
+uv run ruff format --check src/ scripts/ tests/ # target: no files would be reformatted
+                                                # measured 2026-11-04: 22 files — see V2
+uv run mypy src/ scripts/                       # target: no issues (measured: none)
 
 uv run python scripts/00_preflight.py           # expected: 8 [PASS] lines, exit 0
 uv run python scripts/z_generate_manuscript_variables.py  # regenerates output/, exit 0

@@ -18,14 +18,16 @@ environment's pytest and exits zero, which reads as a gate that passed when it n
 prints the test count and the coverage it measured; the root guide's checklist asks you to report those
 in your work note together with the commit SHA, rather than writing them into prose that drifts.
 
-A worktree cut outside the vault has no `.venv` and no sibling `../bond-api` checkout, which
-`[tool.uv.sources]` in `pyproject.toml` needs. Run it with an interpreter that already exists — for
-example the parent repository's `.venv/bin/python`. No other setting is required: `pyproject.toml` sets
-`pythonpath = [".", "src"]`, and `conftest.py` also inserts `src/` and the repository root.
+A worktree cut outside the vault has no `.venv`. That is now the only missing piece: `[tool.uv.sources]`
+in `pyproject.toml` points at the vendored copy `vendor/bond-api`, which travels with the tree. Run the
+suite with an interpreter that already exists — for example the parent repository's
+`.venv/bin/python` — or let `uv sync --extra dev` create one. No other setting is required:
+`pyproject.toml` sets `pythonpath = [".", "src"]`, and `conftest.py` also inserts `src/` and the
+repository root.
 
-**Dated:** as of 2026-11-03 the vendoring change in this suite replaces the `../bond-api` path
-dependency with a `vendor/bond-api` directory, after which an ordinary `uv sync` in a worktree resolves
-locally. Re-check this paragraph if that change has landed here.
+**Landed 2026-11-04:** the vendoring change this paragraph anticipated is in — the `../bond-api` path
+dependency is replaced by the `vendor/bond-api` directory, so an ordinary `uv sync --extra dev` in a
+worktree resolves locally with no sibling checkout.
 
 ## Rules
 

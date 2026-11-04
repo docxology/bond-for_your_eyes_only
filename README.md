@@ -78,7 +78,7 @@ not because they are kept in sync, but because there is only one of them.
 ## Install and run
 
 ```bash
-uv sync
+uv sync --extra dev
 ```
 
 Mission phases (each prints deterministic sorted JSON):
@@ -144,10 +144,13 @@ output/                   regenerable artifacts (figures, resolved manuscript) â
 
 ```toml
 [tool.uv.sources]
-bond-api = { path = "../bond-api" }
+bond-api = { path = "vendor/bond-api" }
 ```
 
-(It previously named an absolute path on the author's machine, which resolved only there.)
+The copy ships in the repository (`vendor/bond-api`, byte-checked by
+`scripts/vendor.py --check`), so a clone with no sibling checkouts resolves. It
+previously named a sibling path, and before that an absolute path on the author's
+machine, which resolved only there.
 
 The orchestrator's `load_provider("for_your_eyes_only")` discovers
 `MissionProvider` at module top level on `sys.path`.

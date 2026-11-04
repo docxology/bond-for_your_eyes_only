@@ -13,3 +13,6 @@ output/
 
 # Egg-info from local installs
 **/*.egg-info/
+
+# Build output the vendored copies' own builds write into vendor/.
+vendor/**/build/
