@@ -107,6 +107,13 @@ reach it.
 passed!" and `uv run ruff format --check src/ scripts/ tests/` reports zero
 files to reformat.
 
+*Open design question, recorded rather than folded in* (orchestrator ruling,
+2026-11-04): the install lines now say `uv sync --extra dev`, and that is the
+whole remedy for this change. Whether the dev extra should instead be part of
+the default dependency set — so that a bare `uv sync` can run the gate at all —
+is a separate change with its own trade-off (install weight for every consumer),
+and it is not a blocker for the vendoring.
+
 ### Documentation
 
 **D1 — the ambient-noise model is the one channel term with no source.**
