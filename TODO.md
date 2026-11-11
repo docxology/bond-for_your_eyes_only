@@ -374,3 +374,7 @@ holds, never faster). New manuscript tokens `RESULT_DIVE_BOTTOM_S`,
   boundary, not a live defect.
 - E2/E3 (persist provenance through `bond-utilities`, confirm the coordinator's
   reconcile step) are unchanged and still belong to whoever runs the fleet.
+
+## Workflowz review — 2026-11-10
+
+No new actionable finding survived this bounded, read-only packet review. Inspected the root guidance, README, existing TODO and its closed/open-item accounting, package manifest and Python pins, package exports, and the supplied targeting, routing, and key-recovery excerpts. Existing TODO items were not duplicated, and no production substitute or runtime upgrade was inferred from incomplete evidence. Re-review on a concrete failure or relevant source change, with the affected implementation and its observable verification evidence.
