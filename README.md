@@ -5,6 +5,30 @@
 A deterministic, real-mathematics implementation of the ATAC recovery-and-
 targeting mission in the PROJECT BOND film suite.
 
+## Mission model
+
+```mermaid
+flowchart TD
+    accTitle: For Your Eyes Only implemented mission analyses
+    accDescr: ATAC custodian quorum parameters, wreck depth and current, Ionian graph and moving-contact kinematics feed GF(p) Shamir threshold key escrow and systematic k-of-n erasure-coded key recovery; Haldane decompression dive scheduling, current-drift offset and Ionian risk-cost routing; Constant-bearing fire-control intercept solution and Thorp underwater acoustic link budget. The mission adapter returns quorum reconstruction, dive and insertion plan, firing intercept and SNR margin with provenance, then a debrief.
+    I["ATAC custodian quorum parameters, wreck depth/current, Ionian graph and moving-contact kinematics"]
+    G0["GF(p) Shamir threshold key escrow and systematic k-of-n erasure-coded key recovery"]
+    I --> G0
+    G1["Haldane decompression dive scheduling, current-drift offset and Ionian risk-cost routing"]
+    I --> G1
+    G2["Constant-bearing fire-control intercept solution and Thorp underwater acoustic link budget"]
+    I --> G2
+    O["mission.py: execute returns MissionOutcome<br/>Quorum reconstruction, dive/insertion plan, firing intercept, SNR margin and provenance"]
+    G0 --> O
+    G1 --> O
+    G2 --> O
+    O --> F["debrief: mission summary"]
+```
+
+The branches group implemented capabilities; they do not imply a runtime order.
+
+**Source map:** [`key_escrow.py`](src/for_your_eyes_only/key_escrow.py), [`key_recovery.py`](src/for_your_eyes_only/key_recovery.py); [`underwater_retrieval.py`](src/for_your_eyes_only/underwater_retrieval.py), [`island_routing.py`](src/for_your_eyes_only/island_routing.py); [`targeting.py`](src/for_your_eyes_only/targeting.py), [`acoustic_link.py`](src/for_your_eyes_only/acoustic_link.py); [`mission.py`](src/for_your_eyes_only/mission.py).
+
 ## The film, and what it becomes in software
 
 In the film, the ATAC — Automatic Targeting Attack Communicator — is lost with
