@@ -1,5 +1,7 @@
 # `docs/` — for_your_eyes_only (ATAC)
 
+[Package maintenance](package-maintenance.md) covers dependency and release records.
+
 Developer and agent documentation for the PROJECT BOND film package
 **For Your Eyes Only (1981)**, mission codename **ATAC**.
 

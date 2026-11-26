@@ -1,5 +1,7 @@
 # for_your_eyes_only — ATAC Mission Software
 
+See [package maintenance](docs/package-maintenance.md) for dependency and citation records.
+
 **For Your Eyes Only (1981)** · mission codename **ATAC**
 
 A deterministic, real-mathematics implementation of the ATAC recovery-and-
