@@ -1,5 +1,7 @@
 # Working inside for_your_eyes_only (ATAC) — rules for agents
 
+[Package maintenance](package-maintenance.md) identifies the dependency and citation records.
+
 Read [`architecture.md`](architecture.md) first for what the modules do. This
 file is the set of rules you work under. For step-by-step commands and task
 recipes see [`agent_instructions.md`](agent_instructions.md).
