@@ -1,6 +1,7 @@
 # for_your_eyes_only — ATAC Mission Software
 
-See [package maintenance](docs/package-maintenance.md) for dependency and citation records.
+For the distribution version, checkout Python selection, dependency sources,
+and citation records, see [package maintenance](docs/package-maintenance.md).
 
 **For Your Eyes Only (1981)** · mission codename **ATAC**
 

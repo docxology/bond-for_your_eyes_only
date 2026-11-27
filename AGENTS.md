@@ -1,5 +1,8 @@
 # for_your_eyes_only — ATAC Mission Software
 
+The [package maintenance guide](docs/package-maintenance.md) records the
+distribution identity, Python selection, dependency provenance, and citation metadata.
+
 PROJECT BOND film package for **For Your Eyes Only (1981)**, mission codename
 **ATAC**. Scope is **exactly this directory**. The only permitted remote is
 `origin` (`github.com/docxology/bond-for_your_eyes_only`) — never push to a
